@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+selenium
+reportlab
+openpyxl
+httpx
+supabase
+python-dotenv
