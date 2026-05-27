@@ -29,6 +29,7 @@
     <button class="btn btn-secondary btn-sm" onclick="openAddModal()"><i class="fa fa-plus"></i> Nuevo Registro</button>
     <button class="btn btn-primary btn-sm" onclick="procesarTodos()"><i class="fa fa-cogs"></i> Procesar Pendientes</button>
     <button class="btn btn-secondary btn-sm" onclick="descargarCertificados()"><i class="fa fa-download"></i> Descargar Certificados</button>
+    <button class="btn btn-secondary btn-sm" onclick="enviarCertificados()"><i class="fa fa-paper-plane"></i> Envío Certificados</button>
     <button class="btn btn-secondary btn-sm" onclick="enviarRecibos()"><i class="fa fa-paper-plane"></i> Envío Recibos</button>
   </div>
 </header>
@@ -47,6 +48,22 @@
       <div class="sidebar-item" onclick="setView('pendientes', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-hourglass-half"></i></span><span class="label">Pendientes</span>
         <span class="sidebar-count" id="sb-pend">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('pend-recibo', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-receipt"></i></span><span class="label">Pend. Recibo</span>
+        <span class="sidebar-count" id="sb-pend-recibo">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('pend-pagos', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-money-check-alt"></i></span><span class="label">Pend. Pagos</span>
+        <span class="sidebar-count" id="sb-pend-pagos">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('pend-ctl', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-file-signature"></i></span><span class="label">Pend. CTL</span>
+        <span class="sidebar-count" id="sb-pend-ctl">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('pend-ctl-ver', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-file-download"></i></span><span class="label">CTL Verif.</span>
+        <span class="sidebar-count" id="sb-pend-ctl-ver">0</span>
       </div>
       <div class="sidebar-item" onclick="setView('procesados', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-check"></i></span><span class="label">Procesados</span>

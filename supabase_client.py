@@ -44,6 +44,39 @@ def insert_recibo(numero_recibo, certificado_id, monto=None, email_destinatario=
     }
     return supabase.table("recibos").insert(payload).execute()
 
+
+def check_table_exists(table_name: str) -> bool:
+    """Verifica si una tabla existe en Supabase."""
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado. Revisa SUPABASE_URL y SUPABASE_KEY en .env")
+    try:
+        supabase.table(table_name).select("id").limit(1).execute()
+        return True
+    except Exception as e:
+        error_text = str(e).lower()
+        if "does not exist" in error_text or "pgrst205" in error_text or "relation" in error_text:
+            return False
+        raise
+
+
+def normalize_escritura(escritura):
+    """Normaliza valores de escritura para comparación y deduplicación."""
+    if escritura is None:
+        return None
+    valor = str(escritura).strip()
+    if not valor:
+        return None
+    valor = valor.replace(' ', '').replace('-', '').replace('.', '').lower()
+    if not valor:
+        return None
+    try:
+        if valor.replace('.', '', 1).isdigit():
+            valor = str(int(float(valor)))
+    except Exception:
+        pass
+    return valor
+
+
 MAX_PAGE_SIZE = 10000
 MAX_PAGE_SIZE_WARN = 1000
 ALLOWED_SORT_COLUMNS = {
@@ -263,21 +296,29 @@ def get_processed_liq(limit: int = 1000, page: int = 1, sort_by: str = 'updated_
     return query.execute()
 
 
-def get_existing_escrituras(table_name: str = "liq") -> set:
-    """Obtiene el conjunto de todas las escrituras existentes en una tabla."""
+def get_existing_escrituras(table_name: str = "liq", select_cols: tuple = ("escritura", "escritura_str")) -> set:
+    """Obtiene un conjunto de escrituras normalizadas para evitar duplicados por escritura."""
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")
     try:
-        result = supabase.table(table_name).select("escritura").execute()
-        return {row.get("escritura") for row in result.data if row.get("escritura")}
+        result = supabase.table(table_name).select(",".join(select_cols)).execute()
+        existing = set()
+        for row in result.data or []:
+            for col in select_cols:
+                if col in row and row[col] is not None:
+                    norm = normalize_escritura(row[col])
+                    if norm:
+                        existing.add(norm)
+        return existing
     except Exception as e:
         print(f"[WARNING] No se pudo obtener escrituras de {table_name}: {e}")
         return set()
 
 
-def import_liq_from_rows(rows: list, batch_size: int = 100) -> dict:
+def import_rows(rows: list, table_name: str, batch_size: int = 100, unique_cols: tuple = ("escritura", "escritura_str")) -> dict:
     """
-    Importa solo registros nuevos en la tabla liq.
+    Función genérica para importar registros nuevos en cualquier tabla.
+    Detecta duplicados usando normalización de escritura.
     Retorna estadísticas de la importación.
     """
     if not supabase:
@@ -285,21 +326,24 @@ def import_liq_from_rows(rows: list, batch_size: int = 100) -> dict:
     
     if not rows:
         return {"total": 0, "nuevos": 0, "duplicados": 0, "errores": 0, "mensaje": "Sin filas para procesar"}
-    
-    # Obtener escrituras existentes
-    existing = get_existing_escrituras("liq")
+
+    # Obtener escrituras existentes con normalización
+    existing = get_existing_escrituras(table_name, select_cols=unique_cols)
     
     # Separar registros nuevos de duplicados
     nuevos = []
     duplicados = 0
     
     for row in rows:
-        escritura = row.get("escritura")
-        if escritura and escritura in existing:
+        escritura = row.get("escritura") or row.get("escritura_str")
+        escritura_norm = normalize_escritura(escritura)
+        if escritura_norm:
+            row["escritura_str"] = escritura_norm
+        if escritura_norm and escritura_norm in existing:
             duplicados += 1
-        else:
-            nuevos.append(row)
-    
+            continue
+        nuevos.append(row)
+
     # Insertar registros nuevos en lotes
     total_insertados = 0
     errores = 0
@@ -307,19 +351,37 @@ def import_liq_from_rows(rows: list, batch_size: int = 100) -> dict:
     for start in range(0, len(nuevos), batch_size):
         batch = nuevos[start : start + batch_size]
         try:
-            result = supabase.table("liq").insert(batch).execute()
+            supabase.table(table_name).insert(batch).execute()
             total_insertados += len(batch)
         except Exception as e:
-            print(f"[ERROR] Error al insertar lote: {e}")
+            print(f"[ERROR] Error al insertar lote en {table_name}: {e}")
             errores += len(batch)
-    
+
     return {
         "total": len(rows),
         "nuevos": total_insertados,
         "duplicados": duplicados,
         "errores": errores,
-        "mensaje": f"Importación completada: {total_insertados} nuevos, {duplicados} duplicados, {errores} errores"
+        "mensaje": f"Importación completada en {table_name}: {total_insertados} nuevos, {duplicados} duplicados, {errores} errores"
     }
+
+
+def import_liq_from_rows(rows: list, batch_size: int = 100) -> dict:
+    """
+    Importa solo registros nuevos en la tabla liq.
+    Retorna estadísticas de la importación.
+    """
+    return import_rows(rows, "liq", batch_size=batch_size)
+
+
+def import_pagos_from_rows(rows: list, batch_size: int = 100) -> dict:
+    """Importa solo registros nuevos en la tabla pagos_2026."""
+    return import_rows(rows, "pagos_2026", batch_size=batch_size)
+
+
+def import_pagos_consolidado_from_rows(rows: list, batch_size: int = 100) -> dict:
+    """Importa solo registros nuevos en la tabla pagos_consolidado."""
+    return import_rows(rows, "pagos_consolidado", batch_size=batch_size)
 
 
 # ========================

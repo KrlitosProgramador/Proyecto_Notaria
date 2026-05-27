@@ -4,6 +4,7 @@ import uuid
 import threading
 import subprocess
 import io
+from pathlib import Path
 import base64
 import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -15,6 +16,7 @@ load_dotenv()
 from supabase_client import (
     insert_log,
     get_supabase,
+    check_table_exists,
     insert_certificado,
     update_certificado_estado,
     get_certificados_por_usuario,
@@ -24,6 +26,8 @@ from supabase_client import (
     obtener_descargas_pendientes_de_envio,
     marcar_descarga_como_enviada,
     import_liq_from_rows,
+    import_pagos_from_rows,
+    import_pagos_consolidado_from_rows,
 )
 from supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
 from supabase_client import get_liq_stats
@@ -31,6 +35,7 @@ from supabase_client import get_all_liq, get_processed_liq
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(APP_DIR, "static")
+SQL_SCHEMA_FILE = Path(APP_DIR, "supabase_schema_from_excel.sql")
 
 app = FastAPI()
 
@@ -41,6 +46,69 @@ JOBS = {}  # job_id -> {"status": "running|done|error", "logs": [str], "returnco
 
 def _append(job_id: str, line: str):
     JOBS[job_id]["logs"].append(line.rstrip())
+
+
+def load_schema_sql() -> str:
+    """Carga el archivo de esquema SQL."""
+    if not SQL_SCHEMA_FILE.exists():
+        raise RuntimeError(f"No se encontró el archivo de esquema: {SQL_SCHEMA_FILE}")
+    return SQL_SCHEMA_FILE.read_text(encoding="utf-8")
+
+
+def _apply_schema_sql(db_url: str, sql: str) -> None:
+    """Aplica DDL SQL directamente a PostgreSQL."""
+    try:
+        import psycopg
+    except ImportError as exc:
+        raise RuntimeError(
+            "Instala psycopg con `pip install psycopg[binary]` para ejecutar DDL directamente."
+        ) from exc
+
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+
+
+def _get_schema_validation() -> dict:
+    """Valida que existan las tablas requeridas en Supabase."""
+    required_tables = ["liq", "pagos_2026", "pagos_consolidado"]
+    missing = []
+    errors = []
+    for table in required_tables:
+        try:
+            exists = check_table_exists(table)
+        except Exception as e:
+            errors.append({"table": table, "error": str(e)})
+            exists = False
+        if not exists:
+            missing.append(table)
+    return {
+        "required_tables": required_tables,
+        "missing_tables": missing,
+        "errors": errors,
+        "ok": len(missing) == 0 and len(errors) == 0,
+    }
+
+
+def normalize_import_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Normaliza encabezados de Excel/CSV para importación."""
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.lower()
+        .str.replace("á", "a")
+        .str.replace("é", "e")
+        .str.replace("í", "i")
+        .str.replace("ó", "o")
+        .str.replace("ú", "u")
+        .str.replace("ñ", "n")
+        .str.replace("\n", " ")
+        .str.replace("\r", "")
+        .str.replace(" ", "_")
+        .str.replace("-", "_")
+    )
+    return df
 
 def _run_certificados_job(job_id: str):
     """
@@ -102,6 +170,45 @@ def get_job(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="job_id no existe")
     return job
+
+
+@app.get("/api/supabase/schema/validate")
+def validate_supabase_schema():
+    """Valida que existan las tablas requeridas en Supabase."""
+    try:
+        if not get_supabase():
+            raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
+        return _get_schema_validation()
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("validate_schema_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/supabase/schema/apply")
+def apply_supabase_schema():
+    """Aplica el esquema SQL automáticamente."""
+    try:
+        if not get_supabase():
+            raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
+
+        db_url = os.getenv("SUPABASE_DB_URL")
+        if not db_url:
+            raise HTTPException(
+                status_code=400,
+                detail="SUPABASE_DB_URL no está configurada. Establece SUPABASE_DB_URL en .env para aplicar esquema automáticamente.",
+            )
+
+        sql = load_schema_sql()
+        _apply_schema_sql(db_url, sql)
+        schema_status = _get_schema_validation()
+        return {"status": "ok", "message": "SQL aplicado correctamente.", "schema_status": schema_status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("apply_schema_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/liq/pending")
 def listar_pending(limit: int = 100, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
@@ -388,45 +495,81 @@ async def import_excel_file(file: UploadFile = File(...), table: str = "liq"):
     """
     Carga un archivo Excel dinámicamente y lo importa en Supabase.
     Solo carga registros nuevos (detecta duplicados por escritura).
+    Soporta: liq, pagos (pagos_2026), pagos_consolidado
     """
     try:
         if not get_supabase():
             raise HTTPException(status_code=503, detail="Supabase no configurado.")
         
-        # Validar nombre de tabla
-        allowed_tables = ["liq", "pagos"]
+        # Mapeo de nombres de tabla
+        allowed_tables = {
+            "liq": "liq",
+            "pagos": "pagos_2026",
+            "pagos_consolidado": "pagos_consolidado",
+        }
         if table not in allowed_tables:
-            raise HTTPException(status_code=400, detail=f"Tabla no válida. Permitidas: {allowed_tables}")
-        
-        # Leer archivo Excel
+            raise HTTPException(status_code=400, detail=f"Tabla no válida. Permitidas: {list(allowed_tables.keys())}")
+
+        # Leer archivo Excel/CSV
         contents = await file.read()
-        excel_file = io.BytesIO(contents)
-        
-        # Parsear Excel
-        df = pd.read_excel(excel_file, dtype=str)
+        if file.filename.lower().endswith(('.xlsx', '.xls')):
+            excel_file = io.BytesIO(contents)
+            df = pd.read_excel(excel_file, dtype=str)
+            csv_text = df.to_csv(index=False, encoding='utf-8')
+        else:
+            text = contents.decode('utf-8', errors='replace')
+            df = pd.read_csv(io.StringIO(text), dtype=str)
+            csv_text = text
+
         df = df.where(pd.notna(df), None)
-        
-        # Convertir a lista de dicts
+        df = normalize_import_columns(df)
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="El archivo está vacío o no contiene filas válidas.")
+
+        if table == 'liq' and not any('escritura' in col for col in df.columns):
+            raise HTTPException(status_code=400, detail="El archivo debe contener la columna 'Escritura' (o equivalente).")
+
+        # Solo columnas básicas
+        basic_cols = ["escritura", "nir", "correo", "gobernacion"]
+        default_pending = {
+            "pago": "Ingresado",
+            "estado_ctl": "Pendiente",
+            "notificacion": "Pendiente",
+            "devolucion": "",
+        }
+
         rows = df.to_dict(orient="records")
-        
-        # Limpiar y validar filas
         cleaned_rows = []
         for row in rows:
-            cleaned = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items() if k and v}
-            if cleaned:
-                cleaned_rows.append(cleaned)
-        
-        # Importar solo registros nuevos
+            # Solo tomar los campos básicos y rellenar el resto
+            base = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items() if k in basic_cols and v is not None and (not isinstance(v, str) or v.strip() != "")}
+            # Si falta alguno de los básicos, no lo subas
+            if not all(col in base and base[col] for col in ["escritura", "nir", "correo", "gobernacion"]):
+                continue
+            # Rellenar el resto
+            for k, v in default_pending.items():
+                base.setdefault(k, v)
+            cleaned_rows.append(base)
+
+        target_table = allowed_tables[table]
         if table == "liq":
             result = import_liq_from_rows(cleaned_rows, batch_size=100)
+        elif table == "pagos":
+            result = import_pagos_from_rows(cleaned_rows, batch_size=100)
         else:
-            # Para otras tablas, puedes agregar lógica similar
-            result = {"total": len(cleaned_rows), "nuevos": 0, "duplicados": 0, "errores": 0, "mensaje": f"Tabla {table} no implementada aún"}
-        
+            result = import_pagos_consolidado_from_rows(cleaned_rows, batch_size=100)
+
         # Registrar en logs
-        insert_log("import_excel", f"Archivo {file.filename} importado en tabla {table}: {result['nuevos']} nuevos", "sistema")
-        
-        return {"status": "ok", "import_result": result}
+        insert_log("import_excel", f"Archivo {file.filename} importado en tabla {target_table}: {result['nuevos']} nuevos", "sistema")
+
+        preview_lines = csv_text.splitlines()[:5]
+        return {
+            "status": "ok",
+            "import_result": result,
+            "csv_preview": preview_lines,
+            "target_table": target_table,
+        }
     
     except HTTPException:
         raise
