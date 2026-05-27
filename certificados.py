@@ -148,10 +148,16 @@ def iniciar_edge_driver(ruta_driver, opciones):
         return webdriver.Edge(options=opciones)
 
 # --- CONFIGURACIÓN INICIAL ---
-ruta_edgedriver = r"C:\Users\EQUIPO 25\Desktop\Beneficencia\chromedriver-win64\msedgedriver.exe"
-download_folder = r"C:\Users\EQUIPO 25\Desktop\Beneficencia\Certificados"
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+download_folder = os.path.join(APP_DIR, "descargas", "certificados")
 # ruta del fichero
-ruta_xlsx = r"C:\Users\EQUIPO 25\Desktop\Beneficencia\Informe.xlsx"
+ruta_xlsx = os.path.join(APP_DIR, "Informe.xlsx")
+
+# Ruta local del driver (si existe)
+ruta_edgedriver = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
+
+# Crear carpeta de descargas si no existe
+os.makedirs(download_folder, exist_ok=True)
 
 print(f"[INFO] Carpeta de descargas: {download_folder}")
 

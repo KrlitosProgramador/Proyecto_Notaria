@@ -24,10 +24,14 @@ warnings.filterwarnings("ignore")
 # =========================
 # CONFIG
 # =========================
-RUTA_XLSX = r"C:\Users\EQUIPO 25\Desktop\Beneficencia\Informe.xlsx"
-CARPETA_PDFS = r"C:\Users\EQUIPO 25\Desktop\Beneficencia\Recibos"
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+RUTA_XLSX = os.path.join(APP_DIR, "Informe.xlsx")
+CARPETA_PDFS = os.path.join(APP_DIR, "descargas", "recibos")
 
-EDGE_USER_DATA_DIR = r"C:\Users\EQUIPO 25\AppData\Local\Microsoft\Edge\User Data"
+# Crear carpeta de descargas si no existe
+os.makedirs(CARPETA_PDFS, exist_ok=True)
+
+EDGE_USER_DATA_DIR = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data")
 EDGE_PROFILE_DIR = "Default"
 REL = r"https://radicacion.supernotariado.gov.co/app/inicio.dma"
 DESTINATARIO_DEFAULT = "pruebas@ejemplo.com"
