@@ -7,3 +7,4 @@ openpyxl
 httpx
 supabase
 python-dotenv
+python-multipart
