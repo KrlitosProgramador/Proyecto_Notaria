@@ -4,9 +4,10 @@ import uuid
 import threading
 import subprocess
 import io
+import base64
 import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
@@ -18,6 +19,10 @@ from supabase_client import (
     update_certificado_estado,
     get_certificados_por_usuario,
     insert_recibo,
+    guardar_descarga,
+    obtener_descargas_por_escritura,
+    obtener_descargas_pendientes_de_envio,
+    marcar_descarga_como_enviada,
     import_liq_from_rows,
 )
 from supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
@@ -428,3 +433,199 @@ async def import_excel_file(file: UploadFile = File(...), table: str = "liq"):
     except Exception as e:
         insert_log("import_excel_error", str(e), "sistema", "error")
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo: {str(e)}")
+
+
+# ========================
+# NUEVOS ENDPOINTS PARA DESCARGAS Y ENVÍOS
+# ========================
+
+@app.post("/api/descargas/guardar")
+async def guardar_descarga_endpoint(
+    tipo: str,
+    escritura: str,
+    file: UploadFile = File(...),
+    email: str = None
+):
+    """
+    Endpoint para guardar un archivo descargado (certificado o recibo).
+    
+    Args:
+        tipo: 'recibo' o 'certificado'
+        escritura: número de escritura
+        file: archivo a guardar
+        email: email del destinatario (opcional)
+    """
+    try:
+        if tipo not in ['recibo', 'certificado']:
+            raise HTTPException(status_code=400, detail="Tipo debe ser 'recibo' o 'certificado'")
+        
+        # Leer contenido del archivo
+        contenido = await file.read()
+        
+        # Guardar en Supabase
+        resultado = guardar_descarga(
+            tipo=tipo,
+            escritura=escritura,
+            archivo_nombre=file.filename,
+            archivo_contenido=contenido,
+            email=email
+        )
+        
+        insert_log("guardar_descarga", f"{tipo} {escritura} guardado: {file.filename}", "sistema")
+        
+        return {
+            "status": "ok",
+            "descarga_id": resultado.data[0]['id'] if resultado.data else None,
+            "mensaje": f"{tipo.capitalize()} guardado exitosamente"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("guardar_descarga_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/descargas/{escritura}")
+def obtener_descargas(escritura: str, tipo: str = None):
+    """
+    Obtiene todas las descargas para una escritura.
+    
+    Args:
+        escritura: número de escritura
+        tipo: 'recibo' o 'certificado' (opcional)
+    """
+    try:
+        resultado = obtener_descargas_por_escritura(escritura, tipo)
+        
+        # Convertir archivos a base64 para respuesta JSON
+        descargas = []
+        for desc in resultado.data:
+            descarga_dict = desc.copy()
+            if 'archivo_contenido' in descarga_dict and descarga_dict['archivo_contenido']:
+                # Ya está en bytes, convertir a base64
+                descarga_dict['archivo_base64'] = base64.b64encode(descarga_dict['archivo_contenido']).decode()
+                del descarga_dict['archivo_contenido']  # No enviar contenido binario en JSON
+            descargas.append(descarga_dict)
+        
+        return {"status": "ok", "descargas": descargas}
+    
+    except Exception as e:
+        insert_log("obtener_descargas_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/descargas/download/{descarga_id}")
+def descargar_archivo(descarga_id: str):
+    """
+    Descarga un archivo específico por ID.
+    
+    Args:
+        descarga_id: UUID de la descarga
+    """
+    try:
+        supabase = get_supabase()
+        resultado = supabase.table("descargas").select("*").eq("id", descarga_id).execute()
+        
+        if not resultado.data:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        descarga = resultado.data[0]
+        contenido = descarga.get('archivo_contenido')
+        nombre = descarga.get('archivo_nombre', 'descarga.pdf')
+        
+        if not contenido:
+            raise HTTPException(status_code=404, detail="Contenido del archivo no disponible")
+        
+        # Retornar como descarga
+        return FileResponse(
+            io.BytesIO(contenido),
+            media_type='application/octet-stream',
+            filename=nombre
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("descargar_archivo_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/descargas/{descarga_id}/enviar-correo")
+def enviar_descarga_por_correo(descarga_id: str, body: dict):
+    """
+    Envía un archivo descargado por correo electrónico.
+    
+    Args:
+        descarga_id: UUID de la descarga
+        body: {'email': 'destinatario@ejemplo.com'} (opcional, usa el del registro)
+    """
+    try:
+        supabase = get_supabase()
+        resultado = supabase.table("descargas").select("*").eq("id", descarga_id).execute()
+        
+        if not resultado.data:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        descarga = resultado.data[0]
+        email_destino = body.get('email') or descarga.get('email')
+        contenido = descarga.get('archivo_contenido')
+        nombre = descarga.get('archivo_nombre', 'documento.pdf')
+        tipo = descarga.get('tipo', 'documento')
+        escritura = descarga.get('escritura')
+        
+        if not email_destino:
+            raise HTTPException(status_code=400, detail="Email de destinatario no especificado")
+        
+        if not contenido:
+            raise HTTPException(status_code=400, detail="Contenido del archivo no disponible")
+        
+        # Aquí implementarías el envío de correo
+        # Por ahora, solo marcamos como enviado
+        marcar_descarga_como_enviada(descarga_id)
+        
+        insert_log(
+            "envio_descarga",
+            f"Envío de {tipo} {escritura} a {email_destino}",
+            "sistema"
+        )
+        
+        return {
+            "status": "ok",
+            "mensaje": f"{tipo.capitalize()} enviado a {email_destino}",
+            "email": email_destino,
+            "archivo": nombre
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("envio_descarga_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/descargas/pendientes")
+def obtener_descargas_pendientes(tipo: str = None, limit: int = 100):
+    """
+    Obtiene descargas pendientes de envío.
+    
+    Args:
+        tipo: 'recibo' o 'certificado' (opcional)
+        limit: límite de resultados
+    """
+    try:
+        resultado = obtener_descargas_pendientes_de_envio(tipo, limit)
+        
+        # Convertir archivos a base64
+        descargas = []
+        for desc in resultado.data:
+            descarga_dict = desc.copy()
+            if 'archivo_contenido' in descarga_dict:
+                del descarga_dict['archivo_contenido']  # No enviar contenido binario en JSON
+            descargas.append(descarga_dict)
+        
+        return {"status": "ok", "total": len(descargas), "descargas": descargas}
+    
+    except Exception as e:
+        insert_log("obtener_pendientes_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))

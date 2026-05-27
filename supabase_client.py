@@ -321,3 +321,104 @@ def import_liq_from_rows(rows: list, batch_size: int = 100) -> dict:
         "mensaje": f"Importación completada: {total_insertados} nuevos, {duplicados} duplicados, {errores} errores"
     }
 
+
+# ========================
+# FUNCIONES PARA DESCARGAS
+# ========================
+
+def guardar_descarga(tipo: str, escritura: str, archivo_nombre: str, archivo_contenido: bytes, email: str = None):
+    """
+    Guarda un archivo descargado (certificado o recibo) en la tabla descargas.
+    
+    Args:
+        tipo: 'recibo' o 'certificado'
+        escritura: número de escritura
+        archivo_nombre: nombre del archivo (ej: '12345.pdf')
+        archivo_contenido: contenido del archivo en bytes
+        email: email del destinatario (opcional)
+    
+    Returns:
+        Resultado de la inserción
+    """
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    
+    if tipo not in ['recibo', 'certificado']:
+        raise ValueError(f"Tipo inválido: {tipo}. Debe ser 'recibo' o 'certificado'")
+    
+    payload = {
+        "tipo": tipo,
+        "escritura": escritura,
+        "archivo_nombre": archivo_nombre,
+        "archivo_contenido": archivo_contenido,
+        "email": email,
+        "enviado": False,
+    }
+    
+    return supabase.table("descargas").insert(payload).execute()
+
+
+def obtener_descargas_por_escritura(escritura: str, tipo: str = None):
+    """
+    Obtiene todas las descargas para una escritura específica.
+    
+    Args:
+        escritura: número de escritura
+        tipo: 'recibo', 'certificado' o None (ambas)
+    
+    Returns:
+        Lista de descargas
+    """
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    
+    query = supabase.table("descargas").select("*").eq("escritura", escritura)
+    
+    if tipo:
+        query = query.eq("tipo", tipo)
+    
+    return query.execute()
+
+
+def obtener_descargas_pendientes_de_envio(tipo: str = None, limit: int = 100):
+    """
+    Obtiene descargas que aún no han sido enviadas.
+    
+    Args:
+        tipo: 'recibo', 'certificado' o None (ambas)
+        limit: límite de resultados
+    
+    Returns:
+        Lista de descargas pendientes
+    """
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    
+    query = supabase.table("descargas").select("*").eq("enviado", False).limit(limit)
+    
+    if tipo:
+        query = query.eq("tipo", tipo)
+    
+    return query.execute()
+
+
+def marcar_descarga_como_enviada(descarga_id: str):
+    """
+    Marca una descarga como enviada por correo.
+    
+    Args:
+        descarga_id: UUID de la descarga
+    
+    Returns:
+        Resultado de la actualización
+    """
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    
+    import datetime
+    return supabase.table("descargas").update({
+        "enviado": True,
+        "fecha_envio": datetime.datetime.utcnow().isoformat()
+    }).eq("id", descarga_id).execute()
+
+
