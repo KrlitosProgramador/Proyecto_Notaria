@@ -1323,7 +1323,7 @@ function renderDocsList() {
             <div class="doc-info">
               <span class="doc-icon">${d.type==='pdf'?'ðŸ“„':d.type==='docx'?'ðŸ“':'ðŸ“ƒ'}</span>
               <div>
-                <div class="doc-name">${d.name}</div>
+                <div class="doc-name">${d.name} ${d.uploaded?'<span class="badge badge-enviado" style="margin-left:8px;font-size:11px">Subido</span>':''}</div>
                 <div class="doc-size">${d.size}</div>
               </div>
             </div>
@@ -1835,6 +1835,32 @@ function detectarKindDocumento(nombreArchivo) {
   return 'otro';
 }
 
+// Subir archivo al backend (tabla `descargas`)
+async function uploadFileToServer(file, tipo, escritura, email) {
+  try {
+    if (!tipo || (tipo !== 'recibo' && tipo !== 'certificado')) return false;
+    const formData = new FormData();
+    formData.append('tipo', tipo);
+    formData.append('escritura', escritura);
+    if (email) formData.append('email', email);
+    formData.append('file', file, file.name);
+
+    const res = await fetch('/api/descargas/guardar', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) {
+      console.warn('Upload failed for', file.name, await res.text());
+      return false;
+    }
+    const data = await res.json();
+    return !!data.status;
+  } catch (e) {
+    console.error('Error uploading file to server:', e);
+    return false;
+  }
+}
+
 // Helpers para consultar documentos asociados
 function docsDeEscritura(esc) {
   const e = normalizarEscritura(esc);
@@ -1941,6 +1967,47 @@ function handleDocFiles(files) {
 
       procesarUno(escNorm);
 
+    }, 400);
+  });
+  // 2) Auto-subir archivos y (opcional) auto-procesar
+  if (!AUTO_PROCESAR_AL_SUBIR_DOCS) return;
+
+  escrituras.forEach(esc => {
+    setTimeout(async () => {
+      const escNorm = normalizarEscritura(esc);
+      const reg = REGISTROS.find(r => normalizarEscritura(r.escritura) === escNorm);
+
+      if (!reg) {
+        showNotif(`Hay documentos para ${escNorm} pero no existe registro`, 'info');
+        return;
+      }
+
+      if (normalizar(reg.estado_ctl) === 'enviado') return;
+
+      const docs = DOCUMENTOS[escNorm] || [];
+      // Subir los archivos que aún no fueron subidos
+      for (const d of docs) {
+        if (d.uploaded) continue;
+        try {
+          const ok = await uploadFileToServer(d.file, d.kind === 'otro' ? null : d.kind, escNorm, reg.correo);
+          if (ok) {
+            d.uploaded = true;
+            showNotif(`Archivo ${d.name} subido para ${escNorm}`, 'success');
+          } else {
+            console.warn('No se subió', d.name);
+          }
+        } catch (e) {
+          console.warn('Error subiendo', d.name, e);
+        }
+      }
+
+      actualizarUI();
+
+      const tieneDocs = DOCUMENTOS[escNorm] && DOCUMENTOS[escNorm].length;
+      if (!tieneDocs) return;
+
+      console.log('AUTO-PROCESANDO:', escNorm);
+      procesarUno(escNorm);
     }, 400);
   });
 }
