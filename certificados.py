@@ -9,7 +9,7 @@ from selenium.webdriver.edge.options import Options
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver import ActionChains
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, SessionNotCreatedException, StaleElementReferenceException
-from supabase_client import insert_certificado, insert_log, update_liq_estado_by_escritura
+from supabase_client import insert_certificado, insert_log, update_liq_estado_by_escritura, guardar_descarga
 
 # --- HELPERS PARA CLIC ROBUSTO ---
 
@@ -733,6 +733,22 @@ else:
                         insert_log("descarga_certificado", f"Escritura {escritura} marcada como Descargado", row.get('correo', ''))
                     except Exception as e:
                         print(f"[WARN] No se pudo actualizar Supabase: {e}")
+                    # Guardar cada archivo descargado en Supabase (subir bytes)
+                    try:
+                        for fname in archivos_descargados:
+                            ruta_archivo = os.path.join(download_folder, fname)
+                            try:
+                                with open(ruta_archivo, "rb") as f:
+                                    contenido = f.read()
+                                try:
+                                    guardar_descarga("certificado", escritura, fname, contenido, row.get('correo'))
+                                    print(f"[INFO] Guardado en Supabase: {fname}")
+                                except Exception as e:
+                                    print(f"[WARN] No se pudo guardar en Supabase: {e}")
+                            except Exception as e:
+                                print(f"[WARN] No se pudo leer archivo {ruta_archivo}: {e}")
+                    except Exception:
+                        pass
                     print(f"  [INFO] CERTIFICADO(S) OK")
                     procesados += 1
                 else:
