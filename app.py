@@ -5,6 +5,8 @@ import threading
 import subprocess
 import io
 import base64
+import smtplib
+from email.message import EmailMessage
 import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse
@@ -563,40 +565,76 @@ def enviar_descarga_por_correo(descarga_id: str, body: dict):
     try:
         supabase = get_supabase()
         resultado = supabase.table("descargas").select("*").eq("id", descarga_id).execute()
-        
+
         if not resultado.data:
             raise HTTPException(status_code=404, detail="Archivo no encontrado")
-        
+
         descarga = resultado.data[0]
-        email_destino = body.get('email') or descarga.get('email')
+        email_destino = (body or {}).get('email') or descarga.get('email')
         contenido = descarga.get('archivo_contenido')
         nombre = descarga.get('archivo_nombre', 'documento.pdf')
         tipo = descarga.get('tipo', 'documento')
         escritura = descarga.get('escritura')
-        
+
         if not email_destino:
             raise HTTPException(status_code=400, detail="Email de destinatario no especificado")
-        
+
         if not contenido:
             raise HTTPException(status_code=400, detail="Contenido del archivo no disponible")
-        
-        # Aquí implementarías el envío de correo
-        # Por ahora, solo marcamos como enviado
+
+        # SMTP configuration from environment
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port = int(os.getenv("SMTP_PORT", 587))
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASS")
+        smtp_from = os.getenv("SMTP_FROM") or smtp_user
+
+        if not smtp_host or not smtp_user or not smtp_pass:
+            raise HTTPException(status_code=503, detail="SMTP no configurado. Configure SMTP_HOST, SMTP_USER y SMTP_PASS en variables de entorno.")
+
+        # Construir mensaje
+        msg = EmailMessage()
+        msg["Subject"] = f"{tipo.capitalize()} {escritura}"
+        msg["From"] = smtp_from
+        msg["To"] = email_destino
+        msg.set_content(f"Adjunto {tipo} {escritura}")
+
+        # contenido puede venir como memoryview o bytes
+        if isinstance(contenido, memoryview):
+            contenido_bytes = contenido.tobytes()
+        else:
+            contenido_bytes = contenido
+
+        msg.add_attachment(contenido_bytes, maintype="application", subtype="pdf", filename=nombre)
+
+        # Enviar por SMTP
+        try:
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                pass
+
+        # Marcar como enviado en BD
         marcar_descarga_como_enviada(descarga_id)
-        
+
         insert_log(
             "envio_descarga",
             f"Envío de {tipo} {escritura} a {email_destino}",
             "sistema"
         )
-        
+
         return {
             "status": "ok",
             "mensaje": f"{tipo.capitalize()} enviado a {email_destino}",
             "email": email_destino,
             "archivo": nombre
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
