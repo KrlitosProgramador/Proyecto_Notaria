@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from csv import writer
 from operator import le
 import re
@@ -87,11 +88,9 @@ def crear_edge_sin_sesion(download_path: str, headless: bool, wait_seconds: int)
     wait = WebDriverWait(driver, wait_seconds)
     return driver, wait
 
-
 def _kill_edge_processes():
     os.system("taskkill /F /IM msedge.exe >nul 2>&1")
     os.system("taskkill /F /IM msedgedriver.exe >nul 2>&1")
-
 
 def get_edge_driver(carpeta_pdfs, user_data_dir, profile_dir="Default"):
     global _DRIVER
@@ -165,7 +164,6 @@ def preparar_excel(df):
     
     return df
 
-
 def cargar_excel(ruta_xlsx):
     xls = pd.ExcelFile(ruta_xlsx)
     hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
@@ -190,7 +188,6 @@ def cargar_excel(ruta_xlsx):
     )
     return df, hoja
 
-
 def obtener_escrituras_con_pdf(carpeta):
     s = set()
     for f in os.listdir(carpeta):
@@ -200,7 +197,6 @@ def obtener_escrituras_con_pdf(carpeta):
             if esc.isdigit():
                 s.add(esc)
     return s
-
 
 def preparar_listos_para_enviar(df, carpeta_pdfs):
     if "estado_ctl" in df.columns:
@@ -212,7 +208,6 @@ def preparar_listos_para_enviar(df, carpeta_pdfs):
     mask_pdf = df["escritura_str"].isin(con_pdf)
 
     return df[mask_pend & mask_pdf].copy()
-
 
 def buscar_pdf_en_carpeta(carpeta, escritura):
     """Busca el primer PDF asociado a una escritura (compatibilidad hacia atrás)"""
@@ -281,10 +276,10 @@ def adjuntar_multiples_pdfs_en_compose(driver, wait, rutas_archivos):
             except:
                 pass
             
-            print(f"  ✓ Adjuntado: {nombre}")
+            print(f"  [OK] Adjuntado: {nombre}")
             time.sleep(0.5)  # Pequeña pausa entre adjuntos
         except Exception as e:
-            print(f"  ⚠ No se pudo adjuntar {os.path.basename(temp_path)}: {e}")
+            print(f"  [WARN] No se pudo adjuntar {os.path.basename(temp_path)}: {e}")
     
     # Limpiar archivos temporales
     for temp_path in temp_files:
@@ -395,7 +390,6 @@ def construir_mensaje(row):
 
     return correo, asunto, cuerpo
 
-
 def enviar_certificado_unico(payload):
     escritura = str(payload.get("escritura") or "").strip()
     if not escritura:
@@ -438,7 +432,6 @@ def enviar_certificado_unico(payload):
     finally:
         if driver is not None:
             driver.quit()
-
 
 def actualizar_estado_excel(ruta_xlsx, hoja, escritura_str, nuevo_estado):
     df_excel = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
@@ -483,9 +476,9 @@ procesadas = set()
 
 print("=========================================")
 if "correo" in df_listo.columns:
-    print(f"🔍🚀 Pendientes: {len(df_listo)}")
+    print(f"[READY] Pendientes: {len(df_listo)}")
 else:
-    print("⚠️ ALERTA CRÍTICA: La columna 'correo' NO existe en el DataFrame. Por eso usa el valor por defecto.")
+    print("[ALERTA] ALERTA CRITICA: La columna 'correo' NO existe en el DataFrame. Por eso usa el valor por defecto.")
 print("=========================================")
 for _, row in df_listo.iterrows():
     escritura = row["escritura_str"]
@@ -495,7 +488,7 @@ for _, row in df_listo.iterrows():
     # Buscar TODOS los archivos asociados a esta escritura
     rutas_archivos = buscar_pdfs_en_carpeta(CARPETA_PDFS, escritura)
     if not rutas_archivos:
-        print("❌ Sin archivos:", escritura)
+        print("[ERROR] Sin archivos:", escritura)
         continue
 
     correo, asunto, cuerpo = construir_mensaje(row)
@@ -503,7 +496,7 @@ for _, row in df_listo.iterrows():
     try:
         crear_borrador_con_multiples_adjuntos(driver, wait, correo, asunto, cuerpo, rutas_archivos)
         nombres_archivos = ", ".join([f"{escritura} certificado {i+1}{os.path.splitext(r)[1]}" for i, r in enumerate(rutas_archivos)])
-        print("📎 Escritura:", escritura, f"-> Adjuntando {len(rutas_archivos)} archivo(s): {nombres_archivos}")
+        print("[ATTACH] Escritura:", escritura, f"-> Adjuntando {len(rutas_archivos)} archivo(s): {nombres_archivos}")
         actualizar_estado_excel(RUTA_XLSX, hoja, escritura, "Enviado")
         try:
             update_liq_estado_by_escritura(escritura, "Enviado")
@@ -511,12 +504,12 @@ for _, row in df_listo.iterrows():
         except Exception as e:
             print(f"[WARN] No se pudo actualizar Supabase a Enviado para {escritura}: {e}")
         procesadas.add(escritura)
-        print("✅ Enviado:", escritura, "|", correo)
+        print("[OK] Enviado:", escritura, "|", correo)
     except Exception as e:
-        print("❌ Error:", escritura, "|", type(e).__name__)
+        print("[ERROR] Error:", escritura, "|", type(e).__name__)
 
 if driver is not None:
     driver.quit()
 
-print(f"✅ Proceso finalizado. Total escrituras procesadas: {len(procesadas)}")
+print(f"[OK] Proceso finalizado. Total escrituras procesadas: {len(procesadas)}")
 print("=========================================")
