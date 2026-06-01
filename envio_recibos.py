@@ -17,7 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
 import sys
-from supabase_client import insert_recibo, update_certificado_estado, insert_log, get_supabase, update_liq_estado_by_escritura
+from supabase_client import insert_recibo, update_certificado_estado, insert_log, get_supabase, update_liq_estado_by_escritura, guardar_descarga
 
 warnings.filterwarnings("ignore")
 
@@ -728,6 +728,22 @@ for _, row in df_listo.iterrows():
             insert_log("envio_recibo", f"Escritura {escritura} marcada como Enviado", correo)
         except Exception as e:
             print(f"[WARN] No se pudo actualizar Supabase: {e}")
+        # Subir cada archivo a Supabase (guardar en tabla 'descargas')
+        try:
+            for ruta_archivo in rutas_archivos:
+                try:
+                    nombre = os.path.basename(ruta_archivo)
+                    with open(ruta_archivo, "rb") as f:
+                        contenido = f.read()
+                    try:
+                        guardar_descarga("recibo", escritura, nombre, contenido, correo)
+                        print(f"[INFO] Guardado en Supabase: {nombre}")
+                    except Exception as e:
+                        print(f"[WARN] No se pudo guardar en Supabase: {e}")
+                except Exception as e:
+                    print(f"[WARN] No se pudo leer archivo {ruta_archivo}: {e}")
+        except Exception:
+            pass
         procesadas.add(escritura)
         print(f"[SUCCESS] Enviado: {escritura} | {correo}")
     except Exception as e:
