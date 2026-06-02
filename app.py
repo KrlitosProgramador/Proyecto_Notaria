@@ -213,7 +213,7 @@ def apply_supabase_schema():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/liq/pending")
-def listar_pending(limit: int = 100, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
+def listar_pending(limit: int = 10000, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
     try:
         if not get_supabase():
             raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
@@ -240,7 +240,7 @@ def liq_stats():
 
 
 @app.get("/api/liq/all")
-def liq_all(limit: int = 1000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
+def liq_all(limit: int = 10000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
     try:
         if not get_supabase():
             raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
@@ -278,7 +278,7 @@ def patch_liq_row(escritura: str, body: dict):
 
 
 @app.get("/api/liq/processed")
-def liq_processed(limit: int = 1000, page: int = 1, sort_by: str = 'fecha_proceso', desc: bool = True):
+def liq_processed(limit: int = 10000, page: int = 1, sort_by: str = 'fecha_proceso', desc: bool = True):
     try:
         if not get_supabase():
             raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
@@ -290,9 +290,9 @@ def liq_processed(limit: int = 1000, page: int = 1, sort_by: str = 'fecha_proces
 
 
 @app.post("/api/liq/{escritura}/mark")
-def mark_escritura(escritura: str, estado: str):
+def mark_escritura(escritura: str, estado: str, activity_type: str = None):
     try:
-        res = update_liq_estado_by_escritura(escritura, estado)
+        res = update_liq_estado_by_escritura(escritura, estado, activity_type=activity_type)
         return {"status": "ok", "updated": res.data}
     except Exception as e:
         insert_log("update_liq", str(e), "sistema", "error")

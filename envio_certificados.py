@@ -425,7 +425,8 @@ def enviar_certificado_unico(payload):
         except Exception:
             pass
         try:
-            update_liq_estado_by_escritura(escritura, "Enviado")
+            # Actualizar estado en Supabase - usar activity_type='cert_send' para certificados
+            update_liq_estado_by_escritura(escritura, "Enviado", activity_type='cert_send')
             insert_log("envio_certificado", f"Escritura {escritura} marcada como Enviado", correo)
         except Exception:
             pass
@@ -499,7 +500,8 @@ for _, row in df_listo.iterrows():
         print("[ATTACH] Escritura:", escritura, f"-> Adjuntando {len(rutas_archivos)} archivo(s): {nombres_archivos}")
         actualizar_estado_excel(RUTA_XLSX, hoja, escritura, "Enviado")
         try:
-            update_liq_estado_by_escritura(escritura, "Enviado")
+            # Actualizar estado en Supabase - usar activity_type='cert_send' para certificados
+            update_liq_estado_by_escritura(escritura, "Enviado", activity_type='cert_send')
             insert_log("envio_certificado", f"Escritura {escritura} marcada como Enviado", correo)
         except Exception as e:
             print(f"[WARN] No se pudo actualizar Supabase a Enviado para {escritura}: {e}")

@@ -722,10 +722,10 @@ for _, row in df_listo.iterrows():
         nombres_archivos = ", ".join([os.path.basename(r) for r in rutas_archivos])
         print(f"[INFO] Escritura: {escritura} -> Adjuntando {len(rutas_archivos)} archivo(s): {nombres_archivos}")
         actualizar_estado_excel(RUTA_XLSX, hoja, escritura, "Enviado")
-        # Actualizar estado en Supabase
+        # Actualizar estado en Supabase - usar activity_type='recibos' para actualizar a 'Notificado'
         try:
-            update_liq_estado_by_escritura(escritura, "Enviado")
-            insert_log("envio_recibo", f"Escritura {escritura} marcada como Enviado", correo)
+            update_liq_estado_by_escritura(escritura, "Notificado", activity_type='recibos')
+            insert_log("envio_recibo", f"Escritura {escritura} marcada como Notificado", correo)
         except Exception as e:
             print(f"[WARN] No se pudo actualizar Supabase: {e}")
         # Subir cada archivo a Supabase (guardar en tabla 'descargas')

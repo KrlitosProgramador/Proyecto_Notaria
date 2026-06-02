@@ -727,9 +727,9 @@ else:
                     print(f"[INFO] Se descargaron {len(archivos_descargados)} archivo(s)")
                     obs.append(f"Descargados {len(archivos_descargados)} archivos")
                     actualizar_estado_excel(ruta_xlsx, hoja, escritura, "Descargado")
-                    # Actualizar también en la tabla liq en Supabase
+                    # Actualizar también en la tabla liq en Supabase - usar activity_type='cert_download'
                     try:
-                        update_liq_estado_by_escritura(escritura, "Descargado")
+                        update_liq_estado_by_escritura(escritura, "Descargado", activity_type='cert_download')
                         insert_log("descarga_certificado", f"Escritura {escritura} marcada como Descargado", row.get('correo', ''))
                     except Exception as e:
                         print(f"[WARN] No se pudo actualizar Supabase: {e}")

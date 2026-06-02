@@ -127,19 +127,47 @@ def get_pending_liq(limit: int = 100, page: int = 1, sort_by: str = 'escritura',
     query = _apply_pagination(query, page, limit)
     return query.execute()
 
-def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str):
+def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activity_type: str = None):
+    """
+    Actualiza el estado de un registro en la tabla 'liq'.
+    
+    Args:
+        escritura_str: Número de escritura
+        nuevo_estado: Estado a asignar (usado si activity_type es None)
+        activity_type: Tipo de actividad que determina qué estado asignar:
+            - 'recibos': Cambia estado_ctl a 'Notificado'
+            - 'pagos': Cambia estado_ctl a 'Ingreso'
+            - 'cert_download': Cambia estado_ctl a 'Descargado'
+            - 'cert_send': Mantiene estado (para envío de certificados)
+            - None: Usa 'nuevo_estado' proporcionado
+    """
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")
-    # Intentar actualizar por la columna `escritura` primero, si no afecta filas, intentar `escritura_str`.
+    
+    # Determinar el estado según la actividad
+    estado_final = nuevo_estado  # Por defecto, usa el estado proporcionado
+    
+    if activity_type == 'recibos':
+        estado_final = 'Notificado'
+    elif activity_type == 'pagos':
+        estado_final = 'Ingreso'
+    elif activity_type == 'cert_download':
+        estado_final = 'Descargado'
+    elif activity_type == 'cert_send':
+        # Para envío de certificados, busca estados 'Descargado' o que no sean 'Enviado'
+        # y actualiza a 'Enviado'
+        estado_final = 'Enviado'
+    
+    # Intentar actualizar por la columna `escritura` primero
     try:
-        res = supabase.table("liq").update({"estado_ctl": nuevo_estado}).eq("escritura", escritura_str).execute()
+        res = supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura", escritura_str).execute()
         # Si no actualizó, intentar con escritura_str
         count = getattr(res, 'count', None)
         if (count is None and not (res.data and len(res.data) > 0)) or (count == 0):
-            res = supabase.table("liq").update({"estado_ctl": nuevo_estado}).eq("escritura_str", escritura_str).execute()
+            res = supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura_str", escritura_str).execute()
         return res
     except Exception:
-        return supabase.table("liq").update({"estado_ctl": nuevo_estado}).eq("escritura_str", escritura_str).execute()
+        return supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura_str", escritura_str).execute()
 
 
 def update_liq_row(escritura_str: str, data: dict):
@@ -267,7 +295,7 @@ def get_liq_stats():
     }
 
 
-def get_all_liq(limit: int = 1000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
+def get_all_liq(limit: int = 10000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
     """Devuelve todas las filas de `liq` con paginación y ordenación opcional."""
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")
@@ -279,7 +307,7 @@ def get_all_liq(limit: int = 1000, page: int = 1, sort_by: str = 'updated_at', d
     return query.execute()
 
 
-def get_processed_liq(limit: int = 1000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
+def get_processed_liq(limit: int = 10000, page: int = 1, sort_by: str = 'updated_at', desc: bool = True):
     """Devuelve filas procesadas (pago='Ingresado' y estado_ctl='Enviado')."""
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")

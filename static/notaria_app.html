@@ -239,7 +239,7 @@
     <!-- PENDIENTES -->
     <div id="view-pendientes" class="view fade-in">
       <div class="section-title">Registros Pendientes</div>
-      <div class="section-sub">Filtro: estado_ctl â‰  "enviado" AND pago = "ingresado"</div>
+      <div class="section-sub">Filtro: estado_ctl ="enviado" AND pago = "ingresado"</div>
       <div class="toolbar">
         <div class="search-box">
           <input type="text" placeholder="Buscar exacto: escritura, NIR, correo" id="search-pendientes" oninput="renderPendientes()">
@@ -499,7 +499,7 @@
     <div class="modal-header">
       <div>
         <div class="modal-title">Procesando Registros</div>
-        <div class="modal-sub" id="proceso-sub">Ejecutando automatizaciÃ³n...</div>
+        <div class="modal-sub" id="proceso-sub">Ejecutando automatización...</div>
       </div>
     </div>
     <div class="modal-body">
@@ -1651,6 +1651,20 @@ function setModalTab(tab, el) {
 // AGREGAR REGISTRO
 // ================================================================
 function openAddModal() {
+  // Limpiar todos los campos del formulario
+  document.getElementById('add-escritura').value = '';
+  document.getElementById('add-nir').value = '';
+  document.getElementById('add-correo').value = '';
+  document.getElementById('add-ruta').value = '';
+  document.getElementById('add-observaciones').value = '';
+  
+  // Reiniciar selects a valores por defecto
+  document.getElementById('add-gob').value = 'cundinamarca';
+  document.getElementById('add-notif').value = 'pendiente';
+  document.getElementById('add-pago').value = 'pendiente';
+  document.getElementById('add-estado').value = 'pendiente';
+  
+  // Abrir modal
   openModal('modal-add');
 }
 
