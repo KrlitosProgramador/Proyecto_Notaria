@@ -1,0 +1,198 @@
+╔════════════════════════════════════════════════════════════════╗
+║          APP NOTARIA - GUÍA RÁPIDA DE DESPLIEGUE               ║
+║                      Versión 1.0.0                             ║
+╚════════════════════════════════════════════════════════════════╝
+
+📌 RESUMEN EJECUTIVO
+════════════════════════════════════════════════════════════════
+
+✅ COMPLETADO:
+  • Aplicación FastAPI completamente funcional
+  • Interfaz web con dashboard interactivo
+  • Sistema de generación de certificados
+  • Scripts de importación de datos
+  • Documentación completa
+  • Scripts de despliegue automático
+
+🎯 PRÓXIMOS PASOS:
+  1. Instalar Git (si no lo tienes)
+  2. Hacer el primer commit
+  3. Configurar producción
+  4. Desplegar sin abrir Visual Studio
+
+
+════════════════════════════════════════════════════════════════
+PASO 1: INSTALAR GIT (Si no lo tienes)
+════════════════════════════════════════════════════════════════
+
+Descarga desde: https://git-scm.com/download/win
+
+Verifica la instalación:
+  Abre PowerShell y escribe: git --version
+
+
+════════════════════════════════════════════════════════════════
+PASO 2: HACER EL PRIMER COMMIT
+════════════════════════════════════════════════════════════════
+
+En PowerShell, ve al directorio del proyecto y ejecuta:
+
+  cd c:\Users\EQUIPO 25\Desktop\Beneficencia\app_notaria
+  powershell -ExecutionPolicy Bypass -File first-commit.ps1
+
+Este script:
+  ✓ Inicializa el repositorio git
+  ✓ Configura tu usuario de git
+  ✓ Agrega todos los archivos
+  ✓ Hace el primer commit
+  ✓ (Opcional) Conecta con repositorio remoto
+
+
+════════════════════════════════════════════════════════════════
+PASO 3: CONFIGURAR PRODUCCIÓN
+════════════════════════════════════════════════════════════════
+
+Edita el archivo: production.env
+
+Cambia estos valores con tus credenciales REALES:
+
+  SUPABASE_URL=https://tu-proyecto.supabase.co
+  SUPABASE_KEY=tu-anon-key
+  SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+
+⚠️ IMPORTANTE: Estos archivos NO se suben a git
+
+
+════════════════════════════════════════════════════════════════
+PASO 4: DESPLEGAR A PRODUCCIÓN (SIN ABRIR VISUAL STUDIO)
+════════════════════════════════════════════════════════════════
+
+Abre PowerShell y ejecuta:
+
+  cd c:\Users\EQUIPO 25\Desktop\Beneficencia\app_notaria
+  powershell -ExecutionPolicy Bypass -File deploy.ps1 start
+
+Eso es todo. La aplicación estará corriendo en:
+
+  🌐 http://localhost:8000
+  📚 Docs: http://localhost:8000/docs
+
+
+════════════════════════════════════════════════════════════════
+COMANDOS ÚTILES
+════════════════════════════════════════════════════════════════
+
+DESPLIEGUE:
+  powershell -ExecutionPolicy Bypass -File deploy.ps1 start   # Iniciar
+  powershell -ExecutionPolicy Bypass -File deploy.ps1 stop    # Detener
+  powershell -ExecutionPolicy Bypass -File deploy.ps1 restart # Reiniciar
+
+GIT:
+  git status               # Ver cambios
+  git add .                # Agregar cambios
+  git commit -m "mensaje"  # Hacer commit
+  git push                 # Subir cambios
+  git log --oneline        # Ver historial
+
+VERIFICACIÓN:
+  curl http://localhost:8000                      # Test básico
+  curl http://localhost:8000/api/liq/stats        # Ver estadísticas
+
+
+════════════════════════════════════════════════════════════════
+ARCHIVOS IMPORTANTES
+════════════════════════════════════════════════════════════════
+
+📄 README.md              - Guía completa del proyecto
+📄 DEPLOYMENT.md          - Guía detallada de despliegue
+📄 GIT_WORKFLOW.md        - Workflow de git y commits
+📄 CHANGELOG.md           - Historial de cambios
+📄 production.env         - Configuración de producción
+📄 deploy.ps1             - Script de despliegue (PowerShell)
+📄 deploy.bat             - Script de despliegue (Batch)
+📄 deploy.sh              - Script de despliegue (Bash)
+📄 first-commit.ps1       - Script para primer commit
+📄 first-commit.sh        - Script para primer commit (Bash)
+
+
+════════════════════════════════════════════════════════════════
+SOLUCIÓN DE PROBLEMAS COMUNES
+════════════════════════════════════════════════════════════════
+
+❌ "Git no está instalado"
+   → Descarga desde: https://git-scm.com/download/win
+   → Reinicia PowerShell después de instalar
+
+❌ "No puedo acceder a http://localhost:8000"
+   → El servidor tarda 30 segundos en iniciar
+   → Espera y recarga la página
+   → Verifica que no haya otro proceso en puerto 8000
+
+❌ "No hay datos en la aplicación"
+   → Crea la tabla en Supabase: supabase_schema_from_excel.sql
+   → Importa datos: python import_liq_from_excel.py
+   → Verifica credenciales en production.env
+
+❌ "Error de conexión a Supabase"
+   → Verifica que SUPABASE_URL sea correcta
+   → Verifica que SUPABASE_KEY sea válida
+   → Verifica que tengas internet
+
+
+════════════════════════════════════════════════════════════════
+ARQUITECTURA DE LA APLICACIÓN
+════════════════════════════════════════════════════════════════
+
+Frontend (Navegador)
+        ↓
+API REST (FastAPI en Puerto 8000)
+        ↓
+Base de datos (Supabase)
+
+Componentes:
+  • app.py               - Servidor principal
+  • static/             - Archivos HTML/CSS/JS
+  • supabase_client.py  - Cliente de Supabase
+  • Scripts de importación
+  • Scripts de generación de reportes
+
+
+════════════════════════════════════════════════════════════════
+SIGUIENTES PASOS
+════════════════════════════════════════════════════════════════
+
+✓ Después del primer commit:
+
+  1. [ ] Guardar URL del repositorio remoto (GitHub, GitLab, etc.)
+  2. [ ] Configurar production.env con credenciales reales
+  3. [ ] Hacer git push origin main
+  4. [ ] Ejecutar: python import_liq_from_excel.py
+  5. [ ] Testear en navegador: http://localhost:8000
+  6. [ ] Configurar certificados SSL (para HTTPS)
+  7. [ ] Configurar backups automáticos
+  8. [ ] Monitorear logs
+
+
+════════════════════════════════════════════════════════════════
+SOPORTE Y DOCUMENTACIÓN
+════════════════════════════════════════════════════════════════
+
+📖 Lee primero:
+   • README.md - Descripción general
+   • DEPLOYMENT.md - Guía de despliegue
+   • GIT_WORKFLOW.md - Cómo hacer commits
+
+🆘 Si tienes problemas:
+   1. Revisa la sección Troubleshooting en DEPLOYMENT.md
+   2. Verifica que Git esté instalado correctamente
+   3. Asegúrate de que las credenciales sean correctas
+   4. Comprueba la conectividad de red
+
+
+════════════════════════════════════════════════════════════════
+
+Versión: 1.0.0
+Estado: ✅ Listo para producción
+Fecha: Mayo 2026
+
+════════════════════════════════════════════════════════════════
