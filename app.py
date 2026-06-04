@@ -15,25 +15,48 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 load_dotenv()
-from .supabase_client import (
-    insert_log,
-    get_supabase,
-    check_table_exists,
-    insert_certificado,
-    update_certificado_estado,
-    get_certificados_por_usuario,
-    insert_recibo,
-    guardar_descarga,
-    obtener_descargas_por_escritura,
-    obtener_descargas_pendientes_de_envio,
-    marcar_descarga_como_enviada,
-    import_liq_from_rows,
-    import_pagos_from_rows,
-    import_pagos_consolidado_from_rows,
-)
-from .supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
-from .supabase_client import get_liq_stats
-from .supabase_client import get_all_liq, get_processed_liq
+try:
+    # Intenta importación relativa (cuando se usa como paquete)
+    from .supabase_client import (
+        insert_log,
+        get_supabase,
+        check_table_exists,
+        insert_certificado,
+        update_certificado_estado,
+        get_certificados_por_usuario,
+        insert_recibo,
+        guardar_descarga,
+        obtener_descargas_por_escritura,
+        obtener_descargas_pendientes_de_envio,
+        marcar_descarga_como_enviada,
+        import_liq_from_rows,
+        import_pagos_from_rows,
+        import_pagos_consolidado_from_rows,
+    )
+    from .supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
+    from .supabase_client import get_liq_stats
+    from .supabase_client import get_all_liq, get_processed_liq
+except ImportError:
+    # Fallback a importación absoluta (cuando se ejecuta directamente con uvicorn)
+    from supabase_client import (
+        insert_log,
+        get_supabase,
+        check_table_exists,
+        insert_certificado,
+        update_certificado_estado,
+        get_certificados_por_usuario,
+        insert_recibo,
+        guardar_descarga,
+        obtener_descargas_por_escritura,
+        obtener_descargas_pendientes_de_envio,
+        marcar_descarga_como_enviada,
+        import_liq_from_rows,
+        import_pagos_from_rows,
+        import_pagos_consolidado_from_rows,
+    )
+    from supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
+    from supabase_client import get_liq_stats
+    from supabase_client import get_all_liq, get_processed_liq
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(APP_DIR, "static")

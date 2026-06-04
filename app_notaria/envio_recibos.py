@@ -237,6 +237,14 @@ def abrir_compose_prefill(driver, correo, asunto, cuerpo):
         f"&body={quote_plus(cuerpo)}"
     )
     driver.get(url)
+    # Esperar a que el compose esté completamente cargado
+    time.sleep(2)
+    try:
+        WebDriverWait(driver, 8).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+        )
+    except Exception:
+        pass
 
 def adjuntar_pdf_en_compose(driver, wait, ruta_pdf):
     """Adjunta un ÚNICO archivo (compatibilidad hacia atrás)"""

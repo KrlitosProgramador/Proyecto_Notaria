@@ -6,7 +6,7 @@
 <title>Sistema Notarial en Gestión de Certificados y Recibos</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <!-- Font Awesome icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
   
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -97,29 +97,28 @@
   <main class="main">
     <!-- DASHBOARD -->
     <div id="view-dashboard" class="view active fade-in">
-      <div class="section-title">Panel de Control</div>
-      <div class="section-sub">Resumen general del sistema notarial</div>
+      <div class="section-title">Panel de Control</div> 
 
       <div class="stats-row">
         <div class="stat-card">
-          <div class="stat-label">Total Registros</div>
+          <div class="stat-label">Total Registros </div>
           <div class="stat-value" id="stat-total">0</div>
-          <div class="stat-delta">REGISTROS_NOTARIA</div>
+          <div class="stat-delta">REGISTROS_NOTARIA <i class="fa-solid fa-check-double"></i></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Pendientes</div>
           <div class="stat-value" id="stat-pend">0</div>
-          <div class="stat-delta pending">â¬¡ por procesar</div>
+          <div class="stat-delta pending">por procesar <i class="fa-solid fa-clock"></i></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Procesados</div>
           <div class="stat-value" id="stat-proc">0</div>
-          <div class="stat-delta up">âœ“ enviados</div>
+          <div class="stat-delta up">enviados <i class="fa-solid fa-paper-plane"></i></div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Documentos</div>
           <div class="stat-value" id="stat-docs">0</div>
-          <div class="stat-delta">archivos asociados</div>
+          <div class="stat-delta">archivos asociados <i class="fa-solid fa-folder"></i></div>
         </div>
       </div>
 
@@ -140,7 +139,7 @@
             <div class="stat-value" id="stat-drafts" style="font-size:20px;">0</div>
             <span class="badge badge-pendiente badge-dot">Sin enviar</span>
           </div>
-          <div class="mt-8 text-muted text-sm">Los correos requieren revisiÃ³n manual antes de enviarse.</div>
+          <div class="mt-8 text-muted text-sm">Los correos requieren revisión manual antes de enviarse.</div>
         </div>
       </div>
 
@@ -148,10 +147,9 @@
       <div class="mt-16">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:16px;">PrÃ³ximos a Procesar</div>
-            <div class="text-muted text-sm">Registros con pago ingresado y estado pendiente</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:16px;">Proximos a Procesar</div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="procesarTodos()">âš¡ Procesar Todos</button>
+          <button class="btn btn-primary btn-sm" onclick="procesarTodos()"><i class="fas fa-cogs"></i> Procesar Todos</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -202,8 +200,8 @@
         <select class="select-filter" id="filter-gob" onchange="renderTable()">
           <option value="">Todas las gobernaciones</option>
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">âœ• Limpiar</button>
-        <button class="btn btn-primary btn-sm" onclick="exportarCSV()">â†“ Exportar</button>
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()"><i class="fa-solid fa-feather"></i> Limpiar</button>
+        <button class="btn btn-primary btn-sm" onclick="exportarCSV()"><i class="fa-solid fa-upload"></i> Exportar</button>
       </div>
 
       <div class="table-wrap">
@@ -211,20 +209,20 @@
           <div class="table-title-sm" id="table-count-label">0 registros</div>
           <div style="display:flex;gap:6px;">
             <button class="btn btn-ghost btn-sm" onclick="seleccionarTodos()">Seleccionar todos</button>
-            <button class="btn btn-warning btn-sm" onclick="procesarSeleccionados()">âš¡ Procesar seleccionados</button>
+            <button class="btn btn-warning btn-sm" onclick="procesarSeleccionados()"><i class="fas fa-cogs"></i> Procesar seleccionados</button>
           </div>
         </div>
         <table>
           <thead>
             <tr>
               <th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
-              <th onclick="sortBy('escritura')">Escritura â‡…</th>
-              <th onclick="sortBy('nir')">NIR â‡…</th>
+              <th onclick="sortBy('escritura')">Escritura</th>
+              <th onclick="sortBy('nir')">NIR</th>
               <th>Correo</th>
-              <th onclick="sortBy('pago')">Pago â‡…</th>
-              <th onclick="sortBy('estado_ctl')">Estado CTL â‡…</th>
+              <th onclick="sortBy('pago')">Pago</th>
+              <th onclick="sortBy('estado_ctl')">Estado CTL</th>
               <th>NotificaciÃ³n</th>
-              <th onclick="sortBy('gobernacion')">GobernaciÃ³n â‡…</th>
+              <th onclick="sortBy('gobernacion')">Gobernación</th>
               <th>Documentos</th>
               <th>Fecha Proceso</th>
               <th>Acciones</th>
@@ -238,16 +236,15 @@
 
     <!-- PENDIENTES -->
     <div id="view-pendientes" class="view fade-in">
-      <div class="section-title">Registros Pendientes</div>
-      <div class="section-sub">Filtro: estado_ctl ="enviado" AND pago = "ingresado"</div>
+      <div class="section-title"><i class="fa-solid fa-file"></i> Registros Pendientes</div>
       <div class="toolbar">
         <div class="search-box">
-          <input type="text" placeholder="Buscar exacto: escritura, NIR, correo" id="search-pendientes" oninput="renderPendientes()">
+          <input type="text" placeholder="Filtro:" id="search-pendientes" oninput="renderPendientes()">
         </div>
         <select class="select-filter" id="filter-pend-gob" onchange="renderPendientes()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosPendientes()">âœ• Limpiar</button>
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosPendientes()"><i class="fa-solid fa-feather"></i> Limpiar</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -268,7 +265,7 @@
       <div class="section-sub">Estado CTL = "enviado"</div>
       <div class="toolbar">
         <div class="search-box">
-          <input type="text" placeholder="Buscar exacto: escritura, NIR, correo" id="search-procesados" oninput="renderProcesados()">
+          <input type="text" placeholder="Filtro:" id="search-procesados" oninput="renderProcesados()">
         </div>
         <select class="select-filter" id="filter-proc-gob" onchange="renderProcesados()">
           <option value="">Todas las gobernaciones</option>
@@ -386,19 +383,19 @@
         <div class="modal-title" id="modal-escritura-title">Escritura</div>
         <div class="modal-sub" id="modal-escritura-sub"></div>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-detalle')">X</button>
+      <button class="modal-close" onclick="closeModal('modal-detalle')"><i class="fa fa-close"></i></button>
     </div>
     <div class="modal-body">
       <div class="tabs" id="modal-tabs">
-        <div class="tab active" onclick="setModalTab('info',this)">Información</div>
-        <div class="tab" onclick="setModalTab('documentos',this)">Documentos</div>
-        <div class="tab" onclick="setModalTab('correo',this)">Correo Generado</div>
+        <div class="tab active" onclick="setModalTab('info',this)"><i class="fa fa-info"></i>Información</div>
+        <div class="tab" onclick="setModalTab('documentos',this)"><i class="fa fa-file"></i>Documentos</div>
+        <div class="tab" onclick="setModalTab('correo',this)"><i class="fa fa-envelope"></i>Correo Generado</div>
       </div>
       <div id="modal-tab-info">
         <div class="detail-grid" id="detail-info-grid"></div>
       </div>
       <div id="modal-tab-documentos" style="display:none">
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('detail-doc-file-input').click()">Adjuntar archivo local</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('detail-doc-file-input').click()"><i class="fa fa-upload"></i>Adjuntar archivo local</button>
         <input type="file" id="detail-doc-file-input" style="display:none" multiple accept=".pdf,.doc,.docx" onchange="handleDocFiles(this.files)">
         <div style="margin-top:12px"></div>
         <div id="modal-docs-list"></div>
@@ -408,10 +405,10 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar</button>
-      <button class="btn btn-warning" id="btn-reprocesar">Reprocesar</button>
-      <button class="btn btn-primary" id="btn-save-detail">Guardar cambios</button>
-      <button class="btn btn-primary" id="btn-marcar-enviado">Marcar como Enviado</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')"><i class="fa fa-close"></i>Cerrar</button>
+      <button class="btn btn-warning" id="btn-reprocesar"><i class="fa fa-refresh"></i>Reprocesar</button>
+      <button class="btn btn-primary" id="btn-save-detail"><i class="fa fa-save"></i>Guardar cambios</button>
+      <button class="btn btn-primary" id="btn-marcar-enviado"><i class="fa fa-check-circle"></i>Marcar como Enviado</button>
     </div>
   </div>
 </div>
@@ -421,10 +418,9 @@
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <div>
-        <div class="modal-title">Nuevo Registro</div>
-        <div class="modal-sub">Agregar manualmente a REGISTROS_NOTARIA</div>
+        <div class="modal-title"><i class="fa fa-plus"></i> Nuevo Registro</div>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-add')">X</button>
+      <button class="modal-close" onclick="closeModal('modal-add')"><i class="fa fa-close"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-grid">
@@ -482,14 +478,10 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-add')">Cancelar</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-add')"><i class="fa fa-times"></i></button>
       <!-- Nuevo: guardar sin procesar -->
-      <button class="btn btn-primary" onclick="guardarNuevoRegistro()">Guardar Registro</button>
-    </div>    
-    <div class="form-group full">
-      <label class="form-label">Ruta Documento</label>
-      <input class="form-input" id="add-ruta">
-    </div>
+      <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>
+    </div>        
   </div>
 </div>
 
@@ -498,7 +490,7 @@
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <div>
-        <div class="modal-title">Procesando Registros</div>
+        <div class="modal-title"><i class="fa fa-cogs"></i> Procesando Registros</div>
         <div class="modal-sub" id="proceso-sub">Ejecutando automatización...</div>
       </div>
     </div>
@@ -509,7 +501,7 @@
       <div class="process-log" id="process-log"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-primary" id="btn-proceso-ok" onclick="closeModal('modal-proceso')" style="display:none">Listo</button>
+      <button class="btn btn-primary" id="btn-proceso-ok" onclick="closeModal('modal-proceso')" style="display:none"><i class="fa fa-check"></i> Listo</button>
     </div>
   </div>
 </div>
@@ -642,12 +634,12 @@ function renderPagination(view, totalRows) {
   const container = document.getElementById(`pagination-${view}`);
   if (!container) return;
   container.innerHTML = `
-    <div class="pagination-info">PÃ¡gina ${state.page} de ${totalPages} Â· ${totalRows} registro${totalRows !== 1 ? 's' : ''}</div>
+    <div class="pagination-info">Página ${state.page} de ${totalPages}  ${totalRows} registro${totalRows !== 1 ? 's' : ''}</div>
     <div class="pagination-controls">
-      <button onclick="setPage('${view}', 1)" ${state.page === 1 ? 'disabled' : ''}>Â«</button>
-      <button onclick="setPage('${view}', ${state.page - 1})" ${state.page === 1 ? 'disabled' : ''}>â€¹</button>
-      <button onclick="setPage('${view}', ${state.page + 1})" ${state.page === totalPages ? 'disabled' : ''}>â€º</button>
-      <button onclick="setPage('${view}', ${totalPages})" ${state.page === totalPages ? 'disabled' : ''}>Â»</button>
+      <button onclick="setPage('${view}', 1)" ${state.page === 1 ? 'disabled' : ''}><<</button>
+      <button onclick="setPage('${view}', ${state.page - 1})" ${state.page === 1 ? 'disabled' : ''}><</button>
+      <button onclick="setPage('${view}', ${state.page + 1})" ${state.page === totalPages ? 'disabled' : ''}>></button>
+      <button onclick="setPage('${view}', ${totalPages})" ${state.page === totalPages ? 'disabled' : ''}>>></button>
       <select onchange="setPageSize('${view}', this.value)">
         <option value="10" ${state.pageSize===10?'selected':''}>10</option>
         <option value="20" ${state.pageSize===20?'selected':''}>20</option>
@@ -1055,20 +1047,20 @@ async function procesarTodos() {
         reg.fecha_proceso = new Date().toLocaleString('es-CO');
         try { await updateRegistroOnServer(normalizarEscritura(reg.escritura), { estado_ctl: reg.estado_ctl, fecha_proceso: reg.fecha_proceso }); } catch(e){ console.warn('No se pudo actualizar servidor tras envÃ­o:', e); }
         ok++;
-        log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">âœ“ Escritura ${reg.escritura} â€” ${mail.tipo} enviado â†’ ${reg.correo}</span></div>`;
+        log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">Escritura ${reg.escritura} ${mail.tipo} enviado ${reg.correo}</span></div>`;
       } else {
         reg.estado_ctl = 'pendiente';
         reg.fecha_proceso = null;
-        log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">âœ— FallÃ³ envÃ­o escritura ${reg.escritura}</span></div>`;
+        log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Falló envío escritura ${reg.escritura}</span></div>`;
       }
     } catch(e) {
-      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">âœ— Error escritura ${reg.escritura}: ${e.message}</span></div>`;
+      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Error escritura ${reg.escritura}: ${e.message}</span></div>`;
     }
     log.scrollTop = log.scrollHeight;
   }
   prog.classList.add('green');
   sub.textContent = `Completado: ${ok} registros procesados`;
-  log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">â”â”â” Proceso finalizado: ${ok}/${pendientes.length} exitosos â”â”â”</span></div>`;
+  log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok"> Proceso finalizado: ${ok}/${pendientes.length} exitosos</span></div>`;
   document.getElementById('btn-proceso-ok').style.display = '';
   actualizarUI();
   showNotif(`${ok} registros procesados correctamente`, 'success');
@@ -1098,9 +1090,9 @@ async function procesarSeleccionados() {
     if (enviado) {
       reg.estado_ctl = 'enviado'; reg.fecha_proceso = new Date().toLocaleString('es-CO');
       try { await updateRegistroOnServer(normalizarEscritura(reg.escritura), { estado_ctl: reg.estado_ctl, fecha_proceso: reg.fecha_proceso }); } catch(e){console.warn(e);}      
-      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">âœ“ Escritura ${reg.escritura} enviada</span></div>`;
+      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">Escritura ${reg.escritura} enviada</span></div>`;
     } else {
-      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">âœ— Error envÃ­o ${reg.escritura}</span></div>`;
+      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Error envío ${reg.escritura}</span></div>`;
     }
     log.scrollTop = log.scrollHeight;
   }
@@ -1186,17 +1178,17 @@ function estadoBadge(estado) {
   if (e === 'enviado') return `<span class="badge badge-enviado badge-dot">Enviado</span>`;
   if (e === 'pendiente') return `<span class="badge badge-pendiente badge-dot">Pendiente</span>`;
   if (e === 'procesando') return `<span class="badge badge-procesando badge-dot">Procesando</span>`;
-  return `<span class="badge">${capFirst(estado||'â€”')}</span>`;
+  return `<span class="badge">${capFirst(estado||'-')}</span>`;
 }
 function pagoBadge(pago) {
   const p = normalizar(pago);
   if (p === 'ingresado') return `<span class="badge badge-ingresado">Ingresado</span>`;
   if (p === 'pendiente') return `<span class="badge badge-pendiente">Pendiente</span>`;
-  return `<span class="badge">${capFirst(pago||'â€”')}</span>`;
+  return `<span class="badge">${capFirst(pago||'—')}</span>`;
 }
 function gobBadge(gobernacion) {
   const g = normalizar(gobernacion);
-  if (!g) return `<span class="badge">â€”</span>`;
+  if (!g) return `<span class="badge">—</span>`;
   return `<span class="badge">${capFirst(g)}</span>`;
 }
 
@@ -1207,7 +1199,7 @@ function renderTable() {
   const label = document.getElementById('table-count-label');
   if (label) label.textContent = `${rows.length} registro${rows.length !== 1 ? 's' : ''}`;
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">â¬œ</div><div class="empty-title">Sin registros</div><div class="empty-sub">Ajuste los filtros o importe un archivo Excel</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon"></div><div class="empty-title">Sin registros</div><div class="empty-sub">Ajuste los filtros o importe un archivo Excel</div></div></td></tr>';
     const pageBar = document.getElementById('pagination-registros');
     if (pageBar) pageBar.innerHTML = '';
     return;
@@ -1222,18 +1214,18 @@ function renderTable() {
     return `<tr class="${selectedRows.has(r.escritura) ? 'selected' : ''}">
       <td class="cb-wrap"><input type="checkbox" ${chk} onchange="toggleRow('${r.escritura}',this)"></td>
       <td class="td-escritura">${r.escritura}</td>
-      <td class="mono">${r.nir||'â€”'}</td>
-      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.correo||''}">${r.correo||'â€”'}</td>
+      <td class="mono">${r.nir||'—'}</td>
+      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.correo||''}">${r.correo||'—'}</td>
       <td>${pagoBadge(r.pago)}</td>
       <td>${estadoBadge(r.estado_ctl)}</td>
       <td>${estadoBadge(r.notificacion)}</td>
       <td>${gobBadge(r.gobernacion)}</td>
-      <td style="text-align:center">${docs ? `<span class="badge badge-ingresado">${docs} doc${docs!==1?'s':''}</span>` : '<span style="color:var(--muted)">â€”</span>'}</td>
-      <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso||'â€”'}</td>
+      <td style="text-align:center">${docs ? `<span class="badge badge-ingresado">${docs} doc${docs!==1?'s':''}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso||'—'}</td>
       <td><div class="row-actions">
-        <button class="btn btn-ghost btn-sm" title="Ver detalle" onclick="verDetalle(${JSON.stringify(r.escritura)})">âŠ™</button>
-        <button class="btn btn-primary btn-sm" title="Procesar" onclick="procesarUno(${JSON.stringify(r.escritura)})">âš¡</button>
-        <button class="btn btn-danger btn-sm" title="Eliminar" onclick="eliminarRegistro(${JSON.stringify(r.escritura)})">âœ•</button>
+        <button class="btn btn-ghost btn-sm" title="Ver detalle" onclick="verDetalle(${JSON.stringify(r.escritura)})"><i class="fas fa-eye"></i></button>
+        <button class="btn btn-primary btn-sm" title="Procesar" onclick="procesarUno(${JSON.stringify(r.escritura)})"><i class="fas fa-cogs"></i></button>
+        <button class="btn btn-danger btn-sm" title="Eliminar" onclick="eliminarRegistro(${JSON.stringify(r.escritura)})"><i class="fas fa-trash"></i></button>
       </div></td>
     </tr>`;
   }).join('');
@@ -1251,12 +1243,12 @@ function renderDashTable() {
     const tipo = esRecibo(r) ? `<span class="badge badge-ingresado">Recibo</span>` : `<span class="badge badge-pendiente">Certificado</span>`;
     return `<tr>
       <td class="td-escritura">${r.escritura}</td>
-      <td class="mono">${r.nir||'â€”'}</td>
-      <td style="font-size:11px">${r.correo||'â€”'}</td>
+      <td class="mono">${r.nir||'—'}</td>
+      <td style="font-size:11px">${r.correo||'—'}</td>
       <td>${tipo}</td>
       <td>${gobBadge(r.gobernacion)}</td>
       <td>${estadoBadge(r.notificacion)}</td>
-      <td><button class="btn btn-primary btn-sm" onclick="procesarUno(${JSON.stringify(r.escritura)})">âš¡ Procesar</button></td>
+      <td><button class="btn btn-primary btn-sm" onclick="procesarUno(${JSON.stringify(r.escritura)})"><i class="fas fa-cogs"></i> Procesar</button></td>
     </tr>`;
   }).join('');
 }
@@ -1266,7 +1258,7 @@ function renderPendientes() {
   if (!tbody) return;
   const rows = getFilteredPendientes();
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">âœ“</div><div class="empty-title">Sin pendientes</div><div class="empty-sub">Todos los registros han sido procesados</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon"></div><div class="empty-title">Sin pendientes</div><div class="empty-sub">Todos los registros han sido procesados</div></div></td></tr>';
     const pageBar = document.getElementById('pagination-pendientes');
     if (pageBar) pageBar.innerHTML = '';
     return;
@@ -1280,15 +1272,15 @@ function renderPendientes() {
     const docs = (DOCUMENTOS[normalizarEscritura(r.escritura)] || []).length;
     return `<tr>
       <td class="td-escritura">${r.escritura}</td>
-      <td class="mono">${r.nir||'â€”'}</td>
-      <td style="font-size:11px">${r.correo||'â€”'}</td>
+      <td class="mono">${r.nir||'—'}</td>
+      <td style="font-size:11px">${r.correo||'—'}</td>
       <td>${tipo}</td>
       <td>${gobBadge(r.gobernacion)}</td>
       <td>${estadoBadge(r.notificacion)}</td>
       <td>${docs?`<span class="badge badge-ingresado">${docs}</span>`:'<span style="color:var(--muted)">0</span>'}</td>
       <td><div class="row-actions">
-        <button class="btn btn-ghost btn-sm" onclick="verDetalle(${JSON.stringify(r.escritura)})">âŠ™</button>
-        <button class="btn btn-primary btn-sm" onclick="procesarUno(${JSON.stringify(r.escritura)})">âš¡ Procesar</button>
+        <button class="btn btn-ghost btn-sm" onclick="verDetalle(${JSON.stringify(r.escritura)})"><i class="fas fa-eye"></i></button>
+        <button class="btn btn-primary btn-sm" onclick="procesarUno(${JSON.stringify(r.escritura)})"><i class="fas fa-cogs"></i> Procesar</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -1300,7 +1292,7 @@ function renderProcesados() {
   if (!tbody) return;
   const rows = getFilteredProcesados();
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">â—·</div><div class="empty-title">Sin procesados aÃºn</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon"> </div><div class="empty-title">Sin procesos</div></div></td></tr>';
     const pageBar = document.getElementById('pagination-procesados');
     if (pageBar) pageBar.innerHTML = '';
     return;
@@ -1313,11 +1305,11 @@ function renderProcesados() {
     const draft = BORRADORES[normalizarEscritura(r.escritura)];
     return `<tr>
       <td class="td-escritura">${r.escritura}</td>
-      <td class="mono">${r.nir||'â€”'}</td>
-      <td style="font-size:11px">${r.correo||'â€”'}</td>
+      <td class="mono">${r.nir||'—'}</td>
+      <td style="font-size:11px">${r.correo||'—'}</td>
       <td>${gobBadge(r.gobernacion)}</td>
-      <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso||'â€”'}</td>
-      <td>${draft?`<button class="btn btn-secondary btn-sm" onclick="verCorreo('${r.escritura}')">âœ‰ Ver borrador</button>`:'<span style="color:var(--muted)">â€”</span>'}</td>
+      <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso||'—'}</td>
+      <td>${draft?`<button class="btn btn-secondary btn-sm" onclick="verCorreo('${r.escritura}')"><i class="fas fa-envelope"></i> Ver borrador</button>`:'<span style="color:var(--muted)">—</span>'}</td>
     </tr>`;
   }).join('');
   renderPagination('procesados', rows.length);
@@ -1338,13 +1330,13 @@ function renderDocsList() {
         ${docs.map(d => `
           <div class="doc-item">
             <div class="doc-info">
-              <span class="doc-icon">${d.type==='pdf'?'ðŸ“„':d.type==='docx'?'ðŸ“':'ðŸ“ƒ'}</span>
+              <span class="doc-icon"><i class="fas fa-file"></i></span>
               <div>
                 <div class="doc-name">${d.name}</div>
                 <div class="doc-size">${d.size}</div>
               </div>
             </div>
-            <button class="btn btn-ghost btn-sm" onclick="quitarDoc('${esc}','${d.name}')">âœ•</button>
+            <button class="btn btn-ghost btn-sm" onclick="quitarDoc('${esc}','${d.name}')"><i class="fas fa-times"></i></button>
           </div>
         `).join('')}
       </div>
@@ -1378,9 +1370,9 @@ function renderMailsList() {
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ASUNTO</div>
         <div style="font-size:13px;color:var(--primary)">${mail.asunto}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:2px">DESTINATARIO</div>
-        <div style="font-size:12px;font-family:'DM Mono',monospace">${mail.para||'â€”'}</div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace">${mail.para||'—'}</div>
         ${mail.adjuntos && mail.adjuntos.length ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:4px">ADJUNTOS (${mail.adjuntos.length})</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${mail.adjuntos.map(a=>`<span class="attach-item"><span class="attach-icon">ðŸ“Ž</span>${a}</span>`).join('')}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${mail.adjuntos.map(a=>`<span class="attach-item"><span class="attach-icon"><i class="fas fa-folder-open"></i></span>${a}</span>`).join('')}</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -1824,7 +1816,7 @@ async function guardarNuevoRegistro(procesar = false) {
 }
 
 // ================================================================
-// DOCUMENTOS (PRO): detecciÃ³n de tipo de documento por nombre
+// DOCUMENTOS (PRO): deteccion de tipo de documento por nombre
 // ================================================================
 
 // Normaliza texto para bÃºsquedas (sin acentos, minÃºsculas)
@@ -2119,23 +2111,23 @@ function renderImportPreview() {
     <div style="font-family:'DM Serif Display',serif;font-size:16px;margin-bottom:12px">Vista Previa (${REGISTROS.length} registros cargados)</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>NotificaciÃ³n</th><th>GobernaciÃ³n</th></tr></thead>
+        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>NotificaciÃ³n</th><th>Gobernación</th></tr></thead>
         <tbody>${REGISTROS.slice(0,5).map(r=>`
           <tr>
             <td class="td-escritura">${r.escritura}</td>
-            <td class="mono">${r.nir||'â€”'}</td>
-            <td style="font-size:11px">${r.correo||'â€”'}</td>
+            <td class="mono">${r.nir||''}</td>
+            <td style="font-size:11px">${r.correo||''}</td>
             <td>${pagoBadge(r.pago)}</td>
             <td>${estadoBadge(r.estado_ctl)}</td>
             <td>${estadoBadge(r.notificacion)}</td>
             <td>${gobBadge(r.gobernacion)}</td>
           </tr>`).join('')}
-        ${REGISTROS.length>5?`<tr><td colspan="7" style="text-align:center;padding:8px;color:var(--muted);font-size:11px">... y ${REGISTROS.length-5} mÃ¡s</td></tr>`:''}
+        ${REGISTROS.length>5?`<tr><td colspan="7" style="text-align:center;padding:8px;color:var(--muted);font-size:11px">... y ${REGISTROS.length-5} más</td></tr>`:''}
         </tbody>
       </table>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="setView('registros',null);actualizarUI()">Ver todos los registros â†’</button>
+      <button class="btn btn-primary" onclick="setView('registros',null);actualizarUI()">Ver todos los registros</button>
       <button class="btn btn-warning" onclick="procesarTodos()">âš¡ Procesar pendientes</button>
     </div>`;
 }
@@ -2152,7 +2144,7 @@ function exportarCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `REGISTROS_NOTARIA_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
-  showNotif('ExportaciÃ³n CSV lista', 'success');
+  showNotif('Exportación CSV lista', 'success');
 }
 
 // ================================================================
@@ -2189,7 +2181,7 @@ function showNotif(msg, type='info') {
   const cont = document.getElementById('notif-container');
   const n = document.createElement('div');
   n.className = `notif ${type}`;
-  n.innerHTML = `<span>${type==='success'?'âœ“':type==='error'?'âœ•':'â„¹'}</span> ${msg}`;
+  n.innerHTML = `<span>${type==='success'?'<i class="fa-solid fa-check"></i>':type==='error'?'<i class="fa-solid fa-xmark"></i>':'<i class="fa-solid fa-info-circle"></i>'}</span> ${msg}`;
   cont.appendChild(n);
   requestAnimationFrame(() => { requestAnimationFrame(() => n.classList.add('show')); });
   setTimeout(() => {
@@ -2266,7 +2258,7 @@ async function descargarCertificados() {
 
       if (job.status === 'error') {
         prog.style.width = '100%';
-        sub.textContent = 'Proceso finalizÃ³ con error (ver log)';
+        sub.textContent = 'Proceso finalizó con error (ver log)';
         btnOk.style.display = '';
         showNotif('Error en descarga de certificados', 'error');
         return;
@@ -2312,7 +2304,7 @@ async function enviarRecibos() {
   log.innerHTML = '';
   prog.classList.remove('green');
   prog.style.width = '5%';
-  sub.textContent = 'Iniciando envÃ­o de recibos (borradores en Gmail)...';
+  sub.textContent = 'Iniciando envío de recibos (borradores en Gmail)...';
   btnOk.style.display = 'none';
 
   let startRes, startOut;
@@ -2365,16 +2357,16 @@ async function enviarRecibos() {
       if (job.status === 'done' || job.status === 'completed') {
         prog.style.width = '100%';
         prog.classList.add('green');
-        sub.textContent = 'EnvÃ­o de recibos finalizado (borradores listos para revisiÃ³n).';
+        sub.textContent = 'Envío de recibos finalizado (borradores listos para revisión).';
         btnOk.style.display = '';
         showNotif('Borradores de recibos generados', 'success');
-        try { await cargarRegistrosDelServidor(); } catch (e) { console.warn('No se pudo recargar registros tras envÃ­os:', e); }
+        try { await cargarRegistrosDelServidor(); } catch (e) { console.warn('No se pudo recargar registros tras envíos:', e); }
         return;
       }
 
       if (job.status === 'error') {
         prog.style.width = '100%';
-        sub.textContent = 'Proceso finalizÃ³ con error (ver log).';
+        sub.textContent = 'Proceso finalizó con error (ver log).';
         btnOk.style.display = '';
         showNotif('Error generando borradores de recibos', 'error');
         return;
@@ -2449,7 +2441,7 @@ async function enviarCertificados() {
   log.innerHTML = '';
   prog.classList.remove('green');
   prog.style.width = '5%';
-  sub.textContent = 'Iniciando envÃ­o/descarga de certificados...';
+  sub.textContent = 'Iniciando envío/descarga de certificados...';
   btnOk.style.display = 'none';
 
   let startRes;
@@ -2496,7 +2488,7 @@ async function enviarRecibosSeleccionados() {
       try { await updateRegistroOnServer(normalizarEscritura(esc), { estado_ctl: reg.estado_ctl, fecha_proceso: reg.fecha_proceso }); } catch(e) { console.warn('No se pudo actualizar servidor:', e); }
       ok++; log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">Enviado recibo: ${esc}</span></div>`;
     } else {
-      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Fallo envÃ­o: ${esc}</span></div>`;
+      log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Fallo envi­o: ${esc}</span></div>`;
     }
     prog.style.width = Math.round(((i+1)/sel.length)*100) + '%';
   }
