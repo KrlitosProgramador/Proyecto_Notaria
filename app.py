@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 load_dotenv()
-from supabase_client import (
+from .supabase_client import (
     insert_log,
     get_supabase,
     check_table_exists,
@@ -31,9 +31,9 @@ from supabase_client import (
     import_pagos_from_rows,
     import_pagos_consolidado_from_rows,
 )
-from supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
-from supabase_client import get_liq_stats
-from supabase_client import get_all_liq, get_processed_liq
+from .supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
+from .supabase_client import get_liq_stats
+from .supabase_client import get_all_liq, get_processed_liq
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(APP_DIR, "static")
