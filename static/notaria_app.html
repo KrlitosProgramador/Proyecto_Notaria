@@ -159,9 +159,9 @@
                 <th>NIR</th>
                 <th>Correo</th>
                 <th>Tipo</th>
-                <th>GobernaciÃ³n</th>
+                <th>Gobernación</th>
                 <th>Estado</th>
-                <th>AcciÃ³n</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody id="dash-table-body">
@@ -182,23 +182,23 @@
           <input type="text" placeholder="Buscar escritura, NIR, correo..." id="search-input" oninput="renderTable()">
         </div>
         <select class="select-filter" id="filter-estado" onchange="renderTable()">
-          <option value="">Todos los estados</option>
+          <option value="">Estado</option>
           <option value="pendiente">Pendiente</option>
           <option value="enviado">Enviado</option>
           <option value="procesando">Procesando</option>
         </select>
         <select class="select-filter" id="filter-pago" onchange="renderTable()">
-          <option value="">Todos los pagos</option>
+          <option value="">Pagos</option>
           <option value="ingresado">Ingresado</option>
           <option value="pendiente">Pendiente</option>
         </select>
         <select class="select-filter" id="filter-notificacion" onchange="renderTable()">
-          <option value="">Todas las notificaciones</option>
+          <option value="">Notificaciones</option>
           <option value="enviado">Enviado</option>
           <option value="pendiente">Pendiente</option>
         </select>
         <select class="select-filter" id="filter-gob" onchange="renderTable()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()"><i class="fa-solid fa-feather"></i> Limpiar</button>
         <button class="btn btn-primary btn-sm" onclick="exportarCSV()"><i class="fa-solid fa-upload"></i> Exportar</button>
@@ -221,7 +221,7 @@
               <th>Correo</th>
               <th onclick="sortBy('pago')">Pago</th>
               <th onclick="sortBy('estado_ctl')">Estado CTL</th>
-              <th>NotificaciÃ³n</th>
+              <th>Notificación</th>
               <th onclick="sortBy('gobernacion')">Gobernación</th>
               <th>Documentos</th>
               <th>Fecha Proceso</th>
@@ -250,7 +250,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Tipo</th><th>GobernaciÃ³n</th><th>NotificaciÃ³n</th><th>Docs</th><th>Acciones</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Tipo</th><th>Gobernación</th><th>Notificación</th><th>Docs</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="pend-table-body"></tbody>
@@ -268,7 +268,7 @@
           <input type="text" placeholder="Filtro:" id="search-procesados" oninput="renderProcesados()">
         </div>
         <select class="select-filter" id="filter-proc-gob" onchange="renderProcesados()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosProcesados()">âœ• Limpiar</button>
       </div>
@@ -276,7 +276,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>GobernaciÃ³n</th><th>Fecha Proceso</th><th>Borrador</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Gobernación</th><th>Fecha Proceso</th><th>Borrador</th>
             </tr>
           </thead>
           <tbody id="proc-table-body"></tbody>
@@ -318,7 +318,7 @@
           <option value="recibo">Recibos</option>
         </select>
         <select class="select-filter" id="filter-mail-gob" onchange="renderMailsList()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
       </div>
       <div id="mails-list"></div>
@@ -481,7 +481,11 @@
       <button class="btn btn-secondary" onclick="closeModal('modal-add')"><i class="fa fa-times"></i></button>
       <!-- Nuevo: guardar sin procesar -->
       <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>
-    </div>        
+    </div>    
+    <div class="form-group full">
+      <label class="form-label">Ruta Documento</label>
+      <input class="form-input" id="add-ruta">
+    </div> 
   </div>
 </div>
 
@@ -736,7 +740,7 @@ function getFilteredProcesados() {
 }
 const PLANTILLAS_RECIBO = {
   cundinamarca: {
-    asunto: (e, n) => `Escritura ${e} NIR ${n} - Recibo GobernaciÃ³n de Cundinamarca`,
+    asunto: (e, n) => `Escritura ${e} NIR ${n} - Recibo Gobernación de Cundinamarca`,
     cuerpo: (e, n) => `Estimado(a) cliente,
    â€” Comunicarse directamente con la NotarÃ­a donde se otorgÃ³ la escritura
    â€” Presentar la solicitud de nota aclaratoria o correcciÃ³n de error
@@ -1146,23 +1150,23 @@ function actualizarUI() {
   const fmg = document.getElementById('filter-mail-gob');
   const gfg = document.getElementById('global-filter-gob');
   if (fg) {
-    fg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fg.innerHTML = '<option value="">Gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpg) {
-    fpg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fpg.innerHTML = '<option value="">Gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpr) {
-    fpr.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fpr.innerHTML = '<option value="">Gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fmg) {
-    fmg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fmg.innerHTML = '<option value="">Gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (gfg) {
-    gfg.innerHTML = '<option value="">Todas las gobernaciones</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
+    gfg.innerHTML = '<option value="">Gobernaciones</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
 
   renderTable();
@@ -1536,12 +1540,12 @@ function verDetalle(esc) {
       <div class="detail-val"><select class="form-select" id="detail-estado_ctl"><option value="pendiente" ${normalizar(reg.estado_ctl||'pendiente')==='pendiente'?'selected':''}>Pendiente</option><option value="enviado" ${normalizar(reg.estado_ctl||'pendiente')==='enviado'?'selected':''}>Enviado</option></select></div>
     </div>
     <div class="detail-item">
-      <div class="detail-key">NotificaciÃ³n</div>
+      <div class="detail-key">Notificación</div>
       <div class="detail-val"><select class="form-select" id="detail-notificacion"><option value="pendiente" ${normalizar(reg.notificacion||'pendiente')==='pendiente'?'selected':''}>Pendiente</option><option value="enviado" ${normalizar(reg.notificacion||'pendiente')==='enviado'?'selected':''}>Enviado</option></select></div>
     </div>
     <div class="detail-item">
-      <div class="detail-key">GobernaciÃ³n</div>
-      <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">â€” sin gobernaciÃ³n â€”</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>BolÃ­var</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>BoyacÃ¡</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>AtlÃ¡ntico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
+      <div class="detail-key">Gobernación</div>
+      <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">— sin gobernación —</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>Bolívar</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>Boyacá</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>Atlántico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
     </div>
     <div class="detail-item">
       <div class="detail-key">Ruta Documento</div>
@@ -1784,7 +1788,7 @@ async function guardarNuevoRegistro(procesar = false) {
   let inserted;
   try {
     inserted = await saveRegistroToServer(nuevo);
-    if (!inserted) throw new Error('No se recibiÃ³ confirmaciÃ³n de inserciÃ³n.');
+    if (!inserted) throw new Error('No se recibio confirmación de inserción.');
   } catch (e) {
     showNotif(e.message, 'error');
     return;
@@ -2111,7 +2115,7 @@ function renderImportPreview() {
     <div style="font-family:'DM Serif Display',serif;font-size:16px;margin-bottom:12px">Vista Previa (${REGISTROS.length} registros cargados)</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>NotificaciÃ³n</th><th>Gobernación</th></tr></thead>
+        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th></tr></thead>
         <tbody>${REGISTROS.slice(0,5).map(r=>`
           <tr>
             <td class="td-escritura">${r.escritura}</td>
