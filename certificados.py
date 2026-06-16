@@ -631,7 +631,6 @@ df['estado_ctl'] = df['estado_ctl'].fillna("").str.strip().str.lower()
 
 # 4. Aplicación de la Triple Condición (AND)
 filtro_estricto = ((df['estado_ctl'] != 'Enviado'.lower())
-                   & (df["estado_ctl"].str.strip().str.lower() != "Descargado".lower())
                    & (df['pago'].str.strip().str.lower() == 'Ingresado'.lower())
                    )
 
