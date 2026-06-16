@@ -159,9 +159,9 @@
                 <th>NIR</th>
                 <th>Correo</th>
                 <th>Tipo</th>
-                <th>GobernaciÃ³n</th>
+                <th>Gobernación</th>
                 <th>Estado</th>
-                <th>AcciÃ³n</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody id="dash-table-body">
@@ -208,7 +208,7 @@
         <div class="table-header-bar">
           <div class="table-title-sm" id="table-count-label">0 registros</div>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="seleccionarTodos()">Seleccionar todos</button>
+            <button class="btn btn-ghost btn-sm" onclick="seleccionarTodos()"><i class="fas fa-check-square"></i> Seleccionar todos</button>
             <button class="btn btn-warning btn-sm" onclick="procesarSeleccionados()"><i class="fas fa-cogs"></i> Procesar seleccionados</button>
           </div>
         </div>
@@ -221,7 +221,7 @@
               <th>Correo</th>
               <th onclick="sortBy('pago')">Pago</th>
               <th onclick="sortBy('estado_ctl')">Estado CTL</th>
-              <th>NotificaciÃ³n</th>
+              <th>Notificación</th>
               <th onclick="sortBy('gobernacion')">Gobernación</th>
               <th>Documentos</th>
               <th>Fecha Proceso</th>
@@ -250,7 +250,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Tipo</th><th>GobernaciÃ³n</th><th>NotificaciÃ³n</th><th>Docs</th><th>Acciones</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Tipo</th><th>Gobernación</th><th>Notificación</th><th>Docs</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="pend-table-body"></tbody>
@@ -276,7 +276,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>GobernaciÃ³n</th><th>Fecha Proceso</th><th>Borrador</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Gobernación</th><th>Fecha Proceso</th><th>Borrador</th>
             </tr>
           </thead>
           <tbody id="proc-table-body"></tbody>
@@ -387,9 +387,9 @@
     </div>
     <div class="modal-body">
       <div class="tabs" id="modal-tabs">
-        <div class="tab active" onclick="setModalTab('info',this)"><i class="fa fa-info"></i>Información</div>
-        <div class="tab" onclick="setModalTab('documentos',this)"><i class="fa fa-file"></i>Documentos</div>
-        <div class="tab" onclick="setModalTab('correo',this)"><i class="fa fa-envelope"></i>Correo Generado</div>
+        <div class="tab active" onclick="setModalTab('info',this)"></i>Información <i class="fa fa-info"></i></div>
+        <div class="tab" onclick="setModalTab('documentos',this)"></i>Documentos <i class="fa fa-file"></i></div>
+        <div class="tab" onclick="setModalTab('correo',this)">Correo Generado <i class="fa fa-envelope"></i></div>
       </div>
       <div id="modal-tab-info">
         <div class="detail-grid" id="detail-info-grid"></div>
@@ -405,10 +405,10 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')"><i class="fa fa-close"></i>Cerrar</button>
-      <button class="btn btn-warning" id="btn-reprocesar"><i class="fa fa-refresh"></i>Reprocesar</button>
-      <button class="btn btn-primary" id="btn-save-detail"><i class="fa fa-save"></i>Guardar cambios</button>
-      <button class="btn btn-primary" id="btn-marcar-enviado"><i class="fa fa-check-circle"></i>Marcar como Enviado</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar <i class="fa fa-close"></i></button>
+      <button class="btn btn-warning" id="btn-reprocesar">Reprocesar <i class="fa fa-refresh"></i></button>
+      <button class="btn btn-primary" id="btn-save-detail">Guardar cambios <i class="fa fa-save"></i></button>
+      <button class="btn btn-primary" id="btn-marcar-enviado">Marcar como Enviado <i class="fa fa-check-circle"></i></button>
     </div>
   </div>
 </div>
@@ -428,14 +428,15 @@
           <label class="form-label">Escritura *</label>
           <input class="form-input" id="add-escritura" placeholder="">
         </div>
-        <div class="form-group">
-          <label class="form-label">NIR *</label>
-          <input class="form-input" id="add-nir" placeholder="202620...">
-        </div>
         <div class="form-group full">
           <label class="form-label">Correo *</label>
           <input class="form-input" id="add-correo" type="email" placeholder="">
         </div>
+        <div class="form-group">
+          <label class="form-label">NIR *</label>
+          <input class="form-input" id="add-nir" placeholder="202620...">
+        </div>
+        
         <div class="form-group">
           <label class="form-label">Gobernación</label>
           <select class="form-select" id="add-gob">
@@ -447,6 +448,7 @@
             <option value="atlantico">Atlántico</option>
             <option value="antioquia">Antioquia</option>
             <option value="magdalena">Magdalena</option>
+            <option value="meta">Meta</option>
             <option value="">— sin gobernación —</option>
           </select>
         </div>
@@ -467,7 +469,8 @@
         <div class="form-group">
           <label class="form-label">Estado CTL</label>
           <select class="form-select" id="add-estado">
-            <option value="pendiente">Pendiente</option>
+            <option value="pendiente">Pendiente</option>            
+            <option value="descargado">Descargado</option>
             <option value="enviado">Enviado</option>
           </select>
         </div>        
@@ -481,6 +484,10 @@
       <button class="btn btn-secondary" onclick="closeModal('modal-add')"><i class="fa fa-times"></i></button>
       <!-- Nuevo: guardar sin procesar -->
       <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>
+      <div class="form-group full">
+      <label class="form-label">Ruta Documento</label>
+      <input class="form-input" id="add-ruta">
+    </div>
     </div>        
   </div>
 </div>
@@ -509,22 +516,13 @@
 <!-- NOTIFICATIONS -->
 <div class="notif-container" id="notif-container"></div>
 
-<!-- Fixed floating menu icon (visible cuando la barra está colapsada) -->
-<button id="fixed-menu-icon" title="Menú" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button>
-<button class="btn btn-ghost hamburger" id="btn-hamburger" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button>
-
 <script>
-// Cierra el menú automáticamente en móvil o al cambiar tamaño
 function closeSidebarOnMobile() {
-  if (window.innerWidth <= 600 && document.body.classList.contains('sidebar-collapsed')) {
-    setTimeout(() => document.body.classList.remove('sidebar-collapsed'), 200);
+  if (window.innerWidth <= 600) {
+    document.body.classList.add('sidebar-hidden');
   }
 }
-window.addEventListener('resize', function() {
-  if (window.innerWidth > 600 && document.body.classList.contains('sidebar-collapsed')) {
-    document.body.classList.remove('sidebar-collapsed');
-  }
-});
+
 // ================================================================
 // DATA STORE
 // ================================================================
@@ -587,7 +585,7 @@ function normalizeSortValue(value) {
 
 // Toggle sidebar collapse (button + fixed icon)
 function toggleSidebar() {
-  document.body.classList.toggle('sidebar-collapsed');
+  document.body.classList.toggle('sidebar-hidden');
 }
 
 function paginateRows(rows, page, pageSize) {
@@ -1645,10 +1643,10 @@ function setModalTab(tab, el) {
 function openAddModal() {
   // Limpiar todos los campos del formulario
   document.getElementById('add-escritura').value = '';
-  document.getElementById('add-nir').value = '';
   document.getElementById('add-correo').value = '';
-  document.getElementById('add-ruta').value = '';
+  document.getElementById('add-nir').value = '';
   document.getElementById('add-observaciones').value = '';
+  document.getElementById('add-ruta').value = '';
   
   // Reiniciar selects a valores por defecto
   document.getElementById('add-gob').value = 'cundinamarca';
@@ -1755,8 +1753,8 @@ async function guardarDetalleActual(esc, extra = {}) {
 
 async function guardarNuevoRegistro(procesar = false) {
   const esc = document.getElementById('add-escritura').value.trim();
-  const nir = document.getElementById('add-nir').value.trim();
   const correo = document.getElementById('add-correo').value.trim();
+  const nir = document.getElementById('add-nir').value.trim();
 
   if (!esc || !correo) {
     showNotif('Escritura y correo son obligatorios', 'error');
@@ -1770,8 +1768,8 @@ async function guardarNuevoRegistro(procesar = false) {
 
   const nuevo = {
     escritura: normalizarEscritura(esc),
-    nir: nir,
     correo: correo,
+    nir: nir,
     pago: document.getElementById('add-pago').value,
     estado_ctl: document.getElementById('add-estado').value,
     notificacion: document.getElementById('add-notif').value,
@@ -1897,7 +1895,7 @@ function asociarDocumento(file) {
 
   const match = name.match(/^(\d+)/);
   if (!match) {
-    showNotif(`"${name}" no comienza con nÃºmero de escritura â€” ignorado`, 'error');
+    showNotif(`"${name}" no comienza con número de escritura - ignorado`, 'error');
     return null;
   }
 
@@ -2021,7 +2019,7 @@ async function handleExcelFile(file) {
     }
     
     const result = data.import_result;
-    const mensaje = `âœ… ImportaciÃ³n completada: ${result.nuevos} nuevos, ${result.duplicados} duplicados`;
+    const mensaje = ` Importación completada: ${result.nuevos} nuevos, ${result.duplicados} duplicados`;
     showNotif(mensaje, 'success');
     
     // Recargar registros desde servidor
@@ -2030,7 +2028,7 @@ async function handleExcelFile(file) {
     
   } catch (e) {
     showNotif(`Error: ${e.message}`, 'error');
-    console.error('Error en importaciÃ³n:', e);
+    console.error('Error en importación:', e);
   }
 }
 
@@ -2111,7 +2109,7 @@ function renderImportPreview() {
     <div style="font-family:'DM Serif Display',serif;font-size:16px;margin-bottom:12px">Vista Previa (${REGISTROS.length} registros cargados)</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>NotificaciÃ³n</th><th>Gobernación</th></tr></thead>
+        <thead><tr><th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th></tr></thead>
         <tbody>${REGISTROS.slice(0,5).map(r=>`
           <tr>
             <td class="td-escritura">${r.escritura}</td>
@@ -2128,7 +2126,7 @@ function renderImportPreview() {
     </div>
     <div style="margin-top:12px;display:flex;gap:8px">
       <button class="btn btn-primary" onclick="setView('registros',null);actualizarUI()">Ver todos los registros</button>
-      <button class="btn btn-warning" onclick="procesarTodos()">âš¡ Procesar pendientes</button>
+      <button class="btn btn-warning" onclick="procesarTodos()">Procesar pendientes</button>
     </div>`;
 }
 
