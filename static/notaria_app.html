@@ -18,36 +18,37 @@
     <div class="header-logo">N</div>
     <div>
       <div class="header-title">Gestión de Registro</div>
-      <div class="header-sub"> Certificados y Recibos</div>
     </div>
   </div>
   <div class="header-actions">
-    <button id="fixed-menu-icon" title="Menú" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button>
     <button class="btn btn-ghost hamburger" id="btn-hamburger" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button> 
-    <span class="badge-version">v2.1.0</span>
     <div id="sel-count" style="margin-right:8px;color:#f0efec;font-size:12px">Seleccionados: 0</div>
-    <button class="btn btn-secondary btn-sm" onclick="openAddModal()"><i class="fa fa-plus"></i> Nuevo Registro</button>
-    <button class="btn btn-primary btn-sm" onclick="procesarTodos()"><i class="fa fa-cogs"></i> Procesar Pendientes</button>
-    <button class="btn btn-secondary btn-sm" onclick="descargarCertificados()"><i class="fa fa-download"></i> Descargar Certificados</button>
-    <button class="btn btn-secondary btn-sm" onclick="enviarCertificados()"><i class="fa fa-paper-plane"></i> Envío Certificados</button>
-    <button class="btn btn-secondary btn-sm" onclick="enviarRecibos()"><i class="fa fa-paper-plane"></i> Envío Recibos</button>
+    <button class="btn btn-secondary btn-sm" onclick="openAddModal()">Nuevo Registro <i class="fa fa-plus"></i></button>
+    <button class="btn btn-primary btn-sm" onclick="procesarTodos()">Procesar Pendientes <i class="fa fa-cogs"></i></button>
+    <button class="btn btn-secondary btn-sm" onclick="descargarCertificados()">Descargar Certificados <i class="fa fa-download"></i></button>
+    <button class="btn btn-secondary btn-sm" onclick="enviarCertificados()">Envío Certificados <i class="fa fa-paper-plane"></i></button>
+    <button class="btn btn-secondary btn-sm" onclick="enviarRecibos()">Envío Recibos <i class="fa fa-paper-plane"></i> </button>
   </div>
 </header>
 <div class="app-layout">
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar-nav">
     <div class="sidebar-section">
-      <div class="sidebar-label">Menú</div>
+      <div class="sidebar-label">Menú</div>      
       <div class="sidebar-item active" onclick="setView('dashboard', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-tachometer-alt"></i></span><span class="label">Dashboard</span>
       </div>
       <div class="sidebar-item" onclick="setView('registros', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-list"></i></span><span class="label">Registros</span>
         <span class="sidebar-count" id="sb-total">0</span>
-      </div>
+      </div>       
       <div class="sidebar-item" onclick="setView('pendientes', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-hourglass-half"></i></span><span class="label">Pendientes</span>
         <span class="sidebar-count" id="sb-pend">0</span>
+      </div>
+      <div class="sidebar-item" onclick="setView('procesados', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-check"></i></span><span class="label">Procesados</span>
+        <span class="sidebar-count" id="sb-proc">0</span>
       </div>
       <div class="sidebar-item" onclick="setView('pend-recibo', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-receipt"></i></span><span class="label">Pend. Recibo</span>
@@ -64,12 +65,9 @@
       <div class="sidebar-item" onclick="setView('pend-ctl-ver', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-file-download"></i></span><span class="label">CTL Verif.</span>
         <span class="sidebar-count" id="sb-pend-ctl-ver">0</span>
-      </div>
-      <div class="sidebar-item" onclick="setView('procesados', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-check"></i></span><span class="label">Procesados</span>
-        <span class="sidebar-count" id="sb-proc">0</span>
-      </div>
+      </div>      
     </div>
+
     <div class="sidebar-section">
       <div class="sidebar-label">Documentos</div>
       <div class="sidebar-item" onclick="setView('documentos', this); closeSidebarOnMobile()">
@@ -81,6 +79,7 @@
         <span class="sidebar-count" id="sb-mails">0</span>
       </div>
     </div>
+
     <div class="sidebar-section">
       <div class="sidebar-label">Importar</div>
       <div class="sidebar-item" onclick="setView('importar', this); closeSidebarOnMobile()">
@@ -387,9 +386,9 @@
     </div>
     <div class="modal-body">
       <div class="tabs" id="modal-tabs">
-        <div class="tab active" onclick="setModalTab('info',this)"></i>Información <i class="fa fa-info"></i></div>
-        <div class="tab" onclick="setModalTab('documentos',this)"></i>Documentos <i class="fa fa-file"></i></div>
-        <div class="tab" onclick="setModalTab('correo',this)">Correo Generado <i class="fa fa-envelope"></i></div>
+        <div class="tab active" onclick="setModalTab('info',this)"></i><i class="fa fa-info"></i> Información</div>
+        <div class="tab" onclick="setModalTab('documentos',this)"></i><i class="fa fa-file"></i> Documentos</div>
+        <div class="tab" onclick="setModalTab('correo',this)"><i class="fa fa-envelope"></i> Correo Generado</div>
       </div>
       <div id="modal-tab-info">
         <div class="detail-grid" id="detail-info-grid"></div>
@@ -405,10 +404,10 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar <i class="fa fa-close"></i></button>
       <button class="btn btn-warning" id="btn-reprocesar">Reprocesar <i class="fa fa-refresh"></i></button>
-      <button class="btn btn-primary" id="btn-save-detail">Guardar cambios <i class="fa fa-save"></i></button>
       <button class="btn btn-primary" id="btn-marcar-enviado">Marcar como Enviado <i class="fa fa-check-circle"></i></button>
+      <button class="btn btn-primary" id="btn-save-detail">Guardar cambios <i class="fa fa-save"></i></button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-detalle')">Cerrar <i class="fa fa-close"></i></button>
     </div>
   </div>
 </div>
@@ -426,17 +425,23 @@
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Escritura *</label>
-          <input class="form-input" id="add-escritura" placeholder="">
+          <input class="form-input" id="add-escritura" placeholder="1234">
         </div>
         <div class="form-group full">
           <label class="form-label">Correo *</label>
-          <input class="form-input" id="add-correo" type="email" placeholder="">
+          <input class="form-input" id="add-correo" type="email" placeholder="pepito@ejemplo.com">
         </div>
         <div class="form-group">
           <label class="form-label">NIR *</label>
           <input class="form-input" id="add-nir" placeholder="202620...">
         </div>
-        
+        <div class="form-group">
+          <label class="form-label">Notificación</label>
+          <select class="form-select" id="add-notif">
+            <option value="pendiente">Pendiente</option>
+            <option value="enviado">Enviado</option>
+          </select>
+        </div>        
         <div class="form-group">
           <label class="form-label">Gobernación</label>
           <select class="form-select" id="add-gob">
@@ -451,14 +456,7 @@
             <option value="meta">Meta</option>
             <option value="">— sin gobernación —</option>
           </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Notificación</label>
-          <select class="form-select" id="add-notif">
-            <option value="pendiente">Pendiente</option>
-            <option value="enviado">Enviado</option>
-          </select>
-        </div>
+        </div>        
         <div class="form-group">
           <label class="form-label">Pago</label>
           <select class="form-select" id="add-pago">
@@ -473,21 +471,21 @@
             <option value="descargado">Descargado</option>
             <option value="enviado">Enviado</option>
           </select>
-        </div>        
+        </div>   
+        <div class="form-group full">
+          <label class="form-label">Ruta Documento</label>
+          <input class="form-input" id="add-ruta" placeholder="Ruta del documento...">
+        </div>     
         <div class="form-group full">
           <label class="form-label">Observaciones</label>
-          <input class="form-input" id="add-observaciones" placeholder="">
+          <input class="form-input" id="add-observaciones" placeholder="Observaciones adicionales...">
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add')"><i class="fa fa-times"></i></button>
       <!-- Nuevo: guardar sin procesar -->
-      <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>
-      <div class="form-group full">
-      <label class="form-label">Ruta Documento</label>
-      <input class="form-input" id="add-ruta">
-    </div>
+      <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>      
     </div>        
   </div>
 </div>
@@ -518,7 +516,7 @@
 
 <script>
 function closeSidebarOnMobile() {
-  if (window.innerWidth <= 600) {
+  if (window.innerWidth <= 700) {
     document.body.classList.add('sidebar-hidden');
   }
 }
@@ -604,6 +602,9 @@ function renderCurrentView() {
   if (currentView === 'pendientes') renderPendientes();
   else if (currentView === 'procesados') renderProcesados();
   else if (currentView === 'registros') renderTable();
+  else if (currentView === 'recibos') renderPendientesRecibo();
+  else if (currentView === 'calificacion') renderPendientesCTLVer();
+  else if (currentView === 'pagos') renderPendientesPagos();
 }
 
 function resetPagination(view) {
@@ -700,7 +701,7 @@ function getFilteredPendientes() {
   const qEl = document.getElementById('search-pendientes') || { value: '' };
   const q = String(qEl.value || '').trim().toLowerCase();
   const fG = (document.getElementById('filter-pend-gob') || {value:''}).value;
-  let rows = filtrarPendientes(REGISTROS);
+  let rows = REGISTROS.filter(r => normalizar(r.estado_ctl) !== 'enviado');
   if (q) {
     const qNorm = q.normalize('NFD').replace(/[ - ]/g, '');
     rows = rows.filter(r => {
@@ -1069,7 +1070,7 @@ async function procesarSeleccionados() {
   if (!sel.length) { showNotif('Seleccione al menos un registro', 'info'); return; }
   const regs = REGISTROS.filter(r => sel.includes(r.escritura));
   const pendientes = filtrarPendientes(regs);
-  if (!pendientes.length) { showNotif('Los registros seleccionados ya estÃ¡n procesados o no cumplen el filtro', 'info'); return; }
+  if (!pendientes.length) { showNotif('Los registros seleccionados ya estan procesados o no cumplen el filtro', 'info'); return; }
   openModal('modal-proceso');
   const log = document.getElementById('process-log');
   const prog = document.getElementById('proceso-progress');
@@ -1131,7 +1132,7 @@ function actualizarUI() {
     gobSide.innerHTML = gobs.map(g => {
       const cnt = REGISTROS.filter(r=>normalizar(r.gobernacion)===g).length;
       return `<div class="sidebar-item" onclick="filtrarPorGob('${g}')">
-        <span class="icon">â—ˆ</span> ${capFirst(g)}
+        <span class="icon"></span> ${capFirst(g)}
         <span class="sidebar-count">${cnt}</span>
       </div>`;
     }).join('');
@@ -1144,23 +1145,23 @@ function actualizarUI() {
   const fmg = document.getElementById('filter-mail-gob');
   const gfg = document.getElementById('global-filter-gob');
   if (fg) {
-    fg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fg.innerHTML = '<option value="">Gobernación</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpg) {
-    fpg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fpg.innerHTML = '<option value="">Gobernación</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpr) {
-    fpr.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fpr.innerHTML = '<option value="">Gobernación</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fmg) {
-    fmg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
+    fmg.innerHTML = '<option value="">Gobernación</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (gfg) {
-    gfg.innerHTML = '<option value="">Todas las gobernaciones</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
+    gfg.innerHTML = '<option value="">Gobernación</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
 
   renderTable();
@@ -1318,7 +1319,7 @@ function renderDocsList() {
   if (!cont) return;
   const entries = Object.entries(DOCUMENTOS);
   if (!entries.length) {
-    cont.innerHTML = '<div class="empty-state"><div class="empty-icon">ðŸ“Ž</div><div class="empty-title">Sin documentos cargados</div><div class="empty-sub">Arrastre archivos arriba para asociarlos</div></div>';
+    cont.innerHTML = '<div class="empty-state"><div class="empty-icon"></div><div class="empty-title">Sin documentos cargados</div><div class="empty-sub">Arrastre archivos arriba para asociarlos</div></div>';
     return;
   }
   cont.innerHTML = entries.map(([esc, docs]) => `
@@ -1509,7 +1510,7 @@ function verDetalle(esc) {
   if (!reg) return;
   currentDetailId = esc;
   document.getElementById('modal-escritura-title').textContent = `Escritura ${reg.escritura}`;
-  document.getElementById('modal-escritura-sub').textContent = `NIR: ${reg.nir||'â€”'} Â· ${reg.correo||'â€”'}`;
+  document.getElementById('modal-escritura-sub').textContent = `NIR: ${reg.nir||''} - ${reg.correo||''}`;
 
   const grid = document.getElementById('detail-info-grid');
   grid.innerHTML = `
@@ -1534,12 +1535,12 @@ function verDetalle(esc) {
       <div class="detail-val"><select class="form-select" id="detail-estado_ctl"><option value="pendiente" ${normalizar(reg.estado_ctl||'pendiente')==='pendiente'?'selected':''}>Pendiente</option><option value="enviado" ${normalizar(reg.estado_ctl||'pendiente')==='enviado'?'selected':''}>Enviado</option></select></div>
     </div>
     <div class="detail-item">
-      <div class="detail-key">NotificaciÃ³n</div>
+      <div class="detail-key">Notificación</div>
       <div class="detail-val"><select class="form-select" id="detail-notificacion"><option value="pendiente" ${normalizar(reg.notificacion||'pendiente')==='pendiente'?'selected':''}>Pendiente</option><option value="enviado" ${normalizar(reg.notificacion||'pendiente')==='enviado'?'selected':''}>Enviado</option></select></div>
     </div>
     <div class="detail-item">
-      <div class="detail-key">GobernaciÃ³n</div>
-      <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">â€” sin gobernaciÃ³n â€”</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>BolÃ­var</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>BoyacÃ¡</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>AtlÃ¡ntico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
+      <div class="detail-key">Gobernación</div>
+      <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">— sin gobernación —</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>Bolívar</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>Boyacá</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>Atlántico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
     </div>
     <div class="detail-item">
       <div class="detail-key">Ruta Documento</div>
@@ -1551,7 +1552,7 @@ function verDetalle(esc) {
     </div>
     <div class="detail-item">
       <div class="detail-key">Fecha Proceso</div>
-      <div class="detail-val"><input class="form-input" id="detail-fecha_proceso" value="${reg.fecha_proceso||'â€”'}" readonly></div>
+      <div class="detail-val"><input class="form-input" id="detail-fecha_proceso" value="${reg.fecha_proceso||''}" readonly></div>
     </div>
     <div class="detail-item">
       <div class="detail-key">Vista correo</div>
@@ -1564,11 +1565,11 @@ function verDetalle(esc) {
   docsEl.innerHTML = docs.length ? docs.map(d => `
     <div class="doc-item">
       <div class="doc-info">
-        <span class="doc-icon">${d.type==='pdf'?'ðŸ“„':'ðŸ“'}</span>
+        <span class="doc-icon">${d.type==='pdf'?'':'<span class="doc-icon">ðŸ“Ž</span>'}</span>
         <div><div class="doc-name">${d.name}</div><div class="doc-size">${d.size}</div></div>
       </div>
     </div>
-  `).join('') : '<div class="empty-state" style="padding:30px"><div class="empty-icon">ðŸ“­</div><div class="empty-title">Sin documentos</div></div>';
+  `).join('') : '<div class="empty-state" style="padding:30px"><div class="empty-icon">­</div><div class="empty-title">Sin documentos</div></div>';
 
   const draft = BORRADORES[normalizarEscritura(esc)];
   const emailEl = document.getElementById('modal-email-preview');
@@ -1576,13 +1577,13 @@ function verDetalle(esc) {
     emailEl.innerHTML = `
       <div class="email-preview">
         <div class="email-header-row">
-          <div class="email-field"><span class="email-field-label">Para:</span><span class="email-field-value">${draft.para||reg.correo||'â€”'}</span></div>
+          <div class="email-field"><span class="email-field-label">Para:</span><span class="email-field-value">${draft.para||reg.correo||''}</span></div>
           <div class="email-field"><span class="email-field-label">Asunto:</span><span class="email-field-value"><strong>${draft.asunto}</strong></span></div>
-          <div class="email-field"><span class="email-field-label">Tipo:</span><span class="email-field-value">${capFirst(draft.tipo||'â€”')}</span></div>
+          <div class="email-field"><span class="email-field-label">Tipo:</span><span class="email-field-value">${capFirst(draft.tipo||'')}</span></div>
         </div>
         <div class="email-body">${draft.cuerpo}</div>
         ${draft.adjuntos && draft.adjuntos.length ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:4px">ADJUNTOS (${draft.adjuntos.length})</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">${draft.adjuntos.map(a=>`<span class="attach-item"><span class="attach-icon">ðŸ“Ž</span>${a}</span>`).join('')}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${draft.adjuntos.map(a=>`<span class="attach-item"><span class="attach-icon"></span>${a}</span>`).join('')}</div>` : ''}
       </div>`;
   } else {
     emailEl.innerHTML = '<div class="empty-state" style="padding:30px"><div class="empty-icon">âœ‰</div><div class="empty-title">Sin borrador generado</div><div class="empty-sub">Procese el registro para generar el correo</div></div>';
@@ -1595,7 +1596,7 @@ function verDetalle(esc) {
     try {
       await guardarDetalleActual(esc, { estado_ctl: r.estado_ctl, fecha_proceso: r.fecha_proceso });
     } catch (e) {
-      console.warn('No se pudo guardar despuÃ©s de reprocesar:', e);
+      console.warn('No se pudo guardar despues de reprocesar:', e);
     }
     closeModal('modal-detalle');
   };
@@ -1676,7 +1677,7 @@ async function saveRegistroToServer(reg) {
 
 async function updateRegistroOnServer(esc, payload) {
   const reg = REGISTROS.find(r => String(r.escritura) === String(esc));
-  if (!reg) throw new Error(`No se encontrÃ³ registro ${esc}`);
+  if (!reg) throw new Error(`No se encontro registro ${esc}`);
 
   const allowed = ['escritura','nir','correo','pago','estado_ctl','notificacion','gobernacion','devolucion','escritura_str','ruta_documento'];
   const body = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
@@ -1782,7 +1783,7 @@ async function guardarNuevoRegistro(procesar = false) {
   let inserted;
   try {
     inserted = await saveRegistroToServer(nuevo);
-    if (!inserted) throw new Error('No se recibiÃ³ confirmaciÃ³n de inserciÃ³n.');
+    if (!inserted) throw new Error('No se recibió confirmación de inserción.');
   } catch (e) {
     showNotif(e.message, 'error');
     return;
@@ -1803,7 +1804,7 @@ async function guardarNuevoRegistro(procesar = false) {
         showNotif(`Registro ${esc} procesado automÃ¡ticamente`, 'success');
       }
     } catch (e) {
-      showNotif(`Fallo al procesar automÃ¡ticamente: ${e.message}`, 'error');
+      showNotif(`Fallo al procesar automaticamente: ${e.message}`, 'error');
     }
   }
 
