@@ -180,23 +180,23 @@
           <input type="text" placeholder="Buscar escritura, NIR, correo..." id="search-input" oninput="renderTable()">
         </div>
         <select class="select-filter" id="filter-estado" onchange="renderTable()">
-          <option value="">Todos los estados</option>
+          <option value="">Estado</option>
           <option value="pendiente">Pendiente</option>
           <option value="enviado">Enviado</option>
           <option value="procesando">Procesando</option>
         </select>
         <select class="select-filter" id="filter-pago" onchange="renderTable()">
-          <option value="">Todos los pagos</option>
+          <option value="">Pagos</option>
           <option value="ingresado">Ingresado</option>
           <option value="pendiente">Pendiente</option>
         </select>
         <select class="select-filter" id="filter-notificacion" onchange="renderTable()">
-          <option value="">Todas las notificaciones</option>
+          <option value="">Notificaciones</option>
           <option value="enviado">Enviado</option>
           <option value="pendiente">Pendiente</option>
         </select>
         <select class="select-filter" id="filter-gob" onchange="renderTable()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">Limpiar <i class="fa-solid fa-feather"></i></button>
         <button class="btn btn-primary btn-sm" onclick="exportarCSV()">Exportar <i class="fa-solid fa-upload"></i> </button>
@@ -265,7 +265,7 @@
           <input type="text" placeholder="Filtro:" id="search-procesados" oninput="renderProcesados()">
         </div>
         <select class="select-filter" id="filter-proc-gob" onchange="renderProcesados()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosProcesados()">Limpiar <i class="fa-solid fa-feather"></i></button>
       </div>
@@ -377,7 +377,7 @@
           <option value="recibo">Recibos</option>
         </select>
         <select class="select-filter" id="filter-mail-gob" onchange="renderMailsList()">
-          <option value="">Todas las gobernaciones</option>
+          <option value="">Gobernaciones</option>
         </select>
       </div>
       <div id="mails-list"></div>
@@ -537,7 +537,11 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add')"><i class="fa fa-times"></i></button>
       <!-- Nuevo: guardar sin procesar -->
-      <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>      
+      <button class="btn btn-primary" onclick="guardarNuevoRegistro()"><i class="fa fa-save"></i></button>
+      <div class="form-group full">
+      <label class="form-label">Ruta Documento</label>
+      <input class="form-input" id="add-ruta">
+    </div>
     </div>        
   </div>
 </div>
@@ -787,7 +791,7 @@ function getFilteredProcesados() {
 }
 const PLANTILLAS_RECIBO = {
   cundinamarca: {
-    asunto: (e, n) => `Escritura ${e} NIR ${n} - Recibo GobernaciÃ³n de Cundinamarca`,
+    asunto: (e, n) => `Escritura ${e} NIR ${n} - Recibo Gobernación de Cundinamarca`,
     cuerpo: (e, n) => `Estimado(a) cliente,
    â€” Comunicarse directamente con la NotarÃ­a donde se otorgÃ³ la escritura
    â€” Presentar la solicitud de nota aclaratoria o correcciÃ³n de error
@@ -1197,23 +1201,23 @@ function actualizarUI() {
   const fmg = document.getElementById('filter-mail-gob');
   const gfg = document.getElementById('global-filter-gob');
   if (fg) {
-    fg.innerHTML = '<option value="">Gobernación</option>' +
+    fg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpg) {
-    fpg.innerHTML = '<option value="">Gobernación</option>' +
+    fpg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fpr) {
-    fpr.innerHTML = '<option value="">Gobernación</option>' +
+    fpr.innerHTML = '<option value="">Todas las gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (fmg) {
-    fmg.innerHTML = '<option value="">Gobernación</option>' +
+    fmg.innerHTML = '<option value="">Todas las gobernaciones</option>' +
       gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
   if (gfg) {
-    gfg.innerHTML = '<option value="">Gobernación</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
+    gfg.innerHTML = '<option value="">Todas las gobernaciones</option>' + gobs.map(g=>`<option value="${g}">${capFirst(g)}</option>`).join('');
   }
 
   renderTable();
@@ -1835,7 +1839,7 @@ async function guardarNuevoRegistro(procesar = false) {
   let inserted;
   try {
     inserted = await saveRegistroToServer(nuevo);
-    if (!inserted) throw new Error('No se recibió confirmación de inserción.');
+    if (!inserted) throw new Error('No se recibiÃ³ confirmaciÃ³n de inserciÃ³n.');
   } catch (e) {
     showNotif(e.message, 'error');
     return;
