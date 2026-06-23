@@ -78,9 +78,9 @@ def normalize_escritura(escritura):
 
 
 MAX_PAGE_SIZE = 10000
-MAX_PAGE_SIZE_WARN = 1000
+MAX_PAGE_SIZE_WARN = 10000
 ALLOWED_SORT_COLUMNS = {
-    'escritura', 'nir', 'pago', 'estado_ctl', 'notificacion', 'gobernacion',
+    'escritura', 'nir', 'notificacion', 'pago', 'estado_ctl', 'gobernacion',
     'updated_at', 'created_at', 'id'
 }
 
@@ -101,7 +101,7 @@ def _apply_sort(query, sort_by: str | None = None, desc: bool = True):
     return query
 
 
-def _apply_pagination(query, page: int = 1, page_size: int = 100):
+def _apply_pagination(query, page: int = 1, page_size: int = 10000):
     page_size = max(1, min(page_size, MAX_PAGE_SIZE))
     page = max(1, page)
     if page_size and page > 0:
@@ -111,7 +111,7 @@ def _apply_pagination(query, page: int = 1, page_size: int = 100):
     return query
 
 
-def get_pending_liq(limit: int = 100, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
+def get_pending_liq(limit: int = 10000, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
     limit = max(1, min(limit, MAX_PAGE_SIZE))
     page = max(1, page)
     """Obtiene filas pendientes: filtro básico por estado_ctl != 'enviado' y pago=='Ingresado'"""
@@ -147,8 +147,8 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     # Determinar el estado según la actividad
     estado_final = nuevo_estado  # Por defecto, usa el estado proporcionado
     
-    if activity_type == 'recibos':
-        estado_final = 'Notificado'
+    if activity_type == 'notificacion':
+        estado_final = 'Enviado'
     elif activity_type == 'pagos':
         estado_final = 'Ingreso'
     elif activity_type == 'cert_download':

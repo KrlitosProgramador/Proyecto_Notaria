@@ -149,9 +149,9 @@
   
   .sidebar-item{ 
     display:flex; 
-    align-items:left; 
-    gap:14px; 
-    padding:14px 16px; 
+    align-items:center; 
+    gap:10px; 
+    padding:8px 20px; 
     border-radius:10px;
     color: var(--primary);
     border-left: 2px solid transparent;
