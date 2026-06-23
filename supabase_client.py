@@ -160,14 +160,14 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     
     # Intentar actualizar por la columna `escritura` primero
     try:
-        res = supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura", escritura_str).execute()
+        res = supabase.table("liq").update({"notificacion": estado_final}).eq("escritura", escritura_str).execute()
         # Si no actualizó, intentar con escritura_str
         count = getattr(res, 'count', None)
         if (count is None and not (res.data and len(res.data) > 0)) or (count == 0):
-            res = supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura_str", escritura_str).execute()
+            res = supabase.table("liq").update({"notificacion": estado_final}).eq("escritura_str", escritura_str).execute()
         return res
     except Exception:
-        return supabase.table("liq").update({"estado_ctl": estado_final}).eq("escritura_str", escritura_str).execute()
+        return supabase.table("liq").update({"notificacion": estado_final}).eq("escritura_str", escritura_str).execute()
 
 
 def update_liq_row(escritura_str: str, data: dict):

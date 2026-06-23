@@ -147,14 +147,19 @@ def preparar_excel(df):
     if col_gob and col_gob != "gobernacion":
         df.rename(columns={col_gob: "gobernacion"}, inplace=True)
     elif "gobernacion" not in df.columns:
-        df["gobernacion"] = ""       
+        df["gobernacion"] = ""      
+    col_pago = next((c for c in df.columns if "pago" in c or "pagado" in c), None)
+    if col_pago and col_pago != "pago":
+        df.rename(columns={col_pago: "pago"}, inplace=True)
+    elif "pago" not in df.columns:
+        df["pago"] = "" 
 
     if "gobernacion" in df.columns:
         df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
     if "correo" in df.columns:
         df["correo"] = df["correo"].fillna("").astype(str).str.strip()
-    if "gobernacion" in df.columns:
-        df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
+    if "pago" in df.columns:
+        df["pago"] = df["pago"].fillna("").astype(str).str.strip()
     
     return df
 
@@ -208,7 +213,6 @@ def buscar_pdf_en_carpeta(carpeta, escritura):
     pdfs = buscar_pdfs_en_carpeta(carpeta, escritura)
     return pdfs[0] if pdfs else None
 
-
 def buscar_pdfs_en_carpeta(carpeta, escritura):
     """Busca TODOS los archivos (PDF, DOC, DOCX) asociados a una escritura"""
     escritura = str(escritura).strip()
@@ -249,7 +253,6 @@ def abrir_compose_prefill(driver, correo, asunto, cuerpo):
 def adjuntar_pdf_en_compose(driver, wait, ruta_pdf):
     """Adjunta un ÚNICO archivo (compatibilidad hacia atrás)"""
     adjuntar_multiples_pdfs_en_compose(driver, wait, [ruta_pdf])
-
 
 def adjuntar_multiples_pdfs_en_compose(driver, wait, rutas_archivos):
     """Adjunta MÚLTIPLES archivos en el compose de Gmail"""
@@ -325,6 +328,7 @@ def process_single_recibo(payload: dict):
         driver, wait = crear_edge_sin_sesion(CARPETA_PDFS, headless=True, wait_seconds=WAIT_SECONDS)
         crear_borrador_con_multiples_adjuntos(driver, wait, correo, asunto, cuerpo, rutas)
         print("[INFO] Borrador creado correctamente")
+        actualizar_estado_excel(RUTA_XLSX, "Liq.", escritura, "Enviado")
         return 0
     except Exception as e:
         print(f"[ERROR] Error creando borrador: {e}")
@@ -732,8 +736,8 @@ for _, row in df_listo.iterrows():
         actualizar_estado_excel(RUTA_XLSX, hoja, escritura, "Enviado")
         # Actualizar estado en Supabase - usar activity_type='recibos' para actualizar a 'Notificado'
         try:
-            update_liq_estado_by_escritura(escritura, "Notificado", activity_type='recibos')
-            insert_log("envio_recibo", f"Escritura {escritura} marcada como Notificado", correo)
+            update_liq_estado_by_escritura(escritura, "Enviado", activity_type='notificacion')
+            insert_log("envio_recibo", f"Escritura {escritura} marcada como Enviado", correo)
         except Exception as e:
             print(f"[WARN] No se pudo actualizar Supabase: {e}")
         # Subir cada archivo a Supabase (guardar en tabla 'descargas')
