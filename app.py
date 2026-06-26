@@ -321,7 +321,21 @@ def mark_escritura(escritura: str, estado: str, activity_type: str = None):
         insert_log("update_liq", str(e), "sistema", "error")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+@app.post("/api/liq/{escritura}/move")
+def move_liq(escritura: str, target: str = None):
+    """Mueve un registro entre tablas liq. Parámetro query: target (nombre de tabla destino)."""
+    try:
+        if not target:
+            raise HTTPException(status_code=400, detail="Parametro 'target' requerido")
+        if not get_supabase():
+            raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
+        res = move_liq_to_table(escritura, target)
+        return {"status": "ok", "moved": getattr(res, 'data', None)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log("move_liq", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
 # Endpoints para Supabase
 @app.get("/api/certificados")
 def listar_certificados(usuario: str = None):
@@ -832,4 +846,51 @@ def obtener_descargas_pendientes(tipo: str = None, limit: int = 100):
     
     except Exception as e:
         insert_log("obtener_pendientes_error", str(e), "sistema", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/envios/devoluciones/start")
+def start_devoluciones():
+    """Encola la ejecución de `prueba_devolucion.py` como job en background."""
+    job_id = str(uuid.uuid4())
+    JOBS[job_id] = {"status": "queued", "logs": [], "returncode": None}
+
+    def _run(job_id):
+        try:
+            JOBS[job_id]["status"] = "running"
+            script_path = os.path.join(APP_DIR, "prueba_devolucion.py")
+            proc = subprocess.Popen(
+                [sys.executable, script_path],
+                cwd=APP_DIR,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            for line in proc.stdout:
+                _append(job_id, line)
+            proc.wait()
+            JOBS[job_id]["returncode"] = proc.returncode
+            JOBS[job_id]["status"] = "done" if proc.returncode == 0 else "error"
+        except Exception as e:
+            JOBS[job_id]["status"] = "error"
+            _append(job_id, f"[EXCEPTION] {type(e).__name__}: {e}")
+
+    t = threading.Thread(target=_run, args=(job_id,), daemon=True)
+    t.start()
+    return {"job_id": job_id}
+
+
+@app.post('/api/export/liq')
+def export_liq_backup():
+    """Genera un backup Excel de la tabla `liq` usando certificados_supabase.
+    Retorna la ruta del archivo generado en el servidor, si está disponible.
+    """
+    if not certificados_supabase:
+        raise HTTPException(status_code=500, detail="Módulo certificados_supabase no disponible")
+    try:
+        ruta = certificados_supabase.exportar_backup_excel()
+        insert_log('export_liq', f'Backup generado: {ruta}', 'sistema')
+        return {"status": "ok", "path": ruta}
+    except Exception as e:
+        insert_log('export_liq_error', str(e), 'sistema', 'error')
         raise HTTPException(status_code=500, detail=str(e))
