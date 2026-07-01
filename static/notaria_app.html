@@ -47,30 +47,30 @@
         <span class="sidebar-count" id="sb-pend">0</span>
       </div>
       <div class="sidebar-item" onclick="setView('procesados', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-check"></i></span><span class="label">Procesados</span>
+        <span class="icon"><i class="fa fa-check"></i></span><span class="label">Procesar</span>
         <span class="sidebar-count" id="sb-proc">0</span>
       </div>
-      <div class="sidebar-item" onclick="setView('pend-recibo', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-receipt"></i></span><span class="label">Pend. Recibo</span>
-        <span class="sidebar-count" id="sb-pend-recibo">0</span>
+      <div class="sidebar-item" onclick="setView('liq2025', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-table"></i></span><span class="label">liq_2025</span>
+        <span class="sidebar-count" id="sb-liq2025">0</span>
       </div>
-      <div class="sidebar-item" onclick="setView('pend-pagos', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-money-check-alt"></i></span><span class="label">Pend. Pagos</span>
-        <span class="sidebar-count" id="sb-pend-pagos">0</span>
+      <div class="sidebar-item" onclick="setView('liq2026', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-table"></i></span><span class="label">liq_2026</span>
+        <span class="sidebar-count" id="sb-liq2026">0</span>
       </div>
-      <div class="sidebar-item" onclick="setView('pend-ctl', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-file-signature"></i></span><span class="label">Pend. CTL</span>
-        <span class="sidebar-count" id="sb-pend-ctl">0</span>
+      <div class="sidebar-item" onclick="setView('consolidado', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-layer-group"></i></span><span class="label">Consolidado</span>
+        <span class="sidebar-count" id="sb-consolidado">0</span>
       </div>
-      <div class="sidebar-item" onclick="setView('pend-ctl-ver', this); closeSidebarOnMobile()">
-        <span class="icon"><i class="fa fa-file-download"></i></span><span class="label">CTL Verif.</span>
-        <span class="sidebar-count" id="sb-pend-ctl-ver">0</span>
+      <div class="sidebar-item" onclick="setView('backup', this); closeSidebarOnMobile()">
+        <span class="icon"><i class="fa fa-download"></i></span><span class="label">Backup Excel</span>
+        <span class="sidebar-count" id="sb-backup">-</span>
       </div>      
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">Documentos</div>
-      <div class="sidebar-item" onclick="setView('documentos', this); closeSidebarOnMobile()">
+        <div class="sidebar-item" onclick="setView('documentos', this); closeSidebarOnMobile()">
         <span class="icon"><i class="fa fa-file"></i></span><span class="label">Archivos</span>
         <span class="sidebar-count" id="sb-docs">0</span>
       </div>
@@ -110,7 +110,7 @@
           <div class="stat-delta pending">por procesar <i class="fa-solid fa-clock"></i></div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Procesados</div>
+          <div class="stat-label">Procesar</div>
           <div class="stat-value" id="stat-proc">0</div>
           <div class="stat-delta up">enviados <i class="fa-solid fa-paper-plane"></i></div>
         </div>
@@ -257,9 +257,9 @@
       <div class="pagination-bar" id="pagination-pendientes"></div>
     </div>
 
-    <!-- PROCESADOS -->
+    <!-- PROCESAR -->
     <div id="view-procesados" class="view fade-in">
-      <div class="section-title">Procesados <i class="fa-solid fa-file"></i>  </div>
+      <div class="section-title">Procesar <i class="fa-solid fa-file"></i>  </div>
       <div class="toolbar">
         <div class="search-box">
           <input type="text" placeholder="Filtro:" id="search-procesados" oninput="renderProcesados()">
@@ -281,7 +281,91 @@
       </div>
       <div class="pagination-bar" id="pagination-procesados"></div>
     </div>
-    
+
+    <!-- LIQ_2025 -->
+    <div id="view-liq2025" class="view fade-in">
+      <div class="section-title">liq_2025 <i class="fa-solid fa-table"></i></div>
+      <div class="toolbar">
+        <div class="search-box">
+          <input type="text" placeholder="Buscar..." id="search-liq2025" oninput="renderLiqTable('liq_2025')">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosLiq('liq2025')">Limpiar <i class="fa-solid fa-feather"></i></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th>
+            </tr>
+          </thead>
+          <tbody id="liq2025-table-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination-bar" id="pagination-liq2025"></div>
+    </div>
+
+    <!-- LIQ_2026 -->
+    <div id="view-liq2026" class="view fade-in">
+      <div class="section-title">liq_2026 <i class="fa-solid fa-table"></i></div>
+      <div class="toolbar">
+        <div class="search-box">
+          <input type="text" placeholder="Buscar..." id="search-liq2026" oninput="renderLiqTable('liq_2026')">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosLiq('liq2026')">Limpiar <i class="fa-solid fa-feather"></i></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th>
+            </tr>
+          </thead>
+          <tbody id="liq2026-table-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination-bar" id="pagination-liq2026"></div>
+    </div>
+
+    <!-- CONSOLIDADO -->
+    <div id="view-consolidado" class="view fade-in">
+      <div class="section-title">Consolidado por Tablas <i class="fa-solid fa-layer-group"></i></div>
+      <div class="stats-row" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+        <div class="stat-card">
+          <div class="stat-label">Total liq</div>
+          <div class="stat-value" id="stat-table-liq">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total liq_2025</div>
+          <div class="stat-value" id="stat-table-liq2025">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total liq_2026</div>
+          <div class="stat-value" id="stat-table-liq2026">0</div>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Tabla</th><th>Registros</th><th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="consolidado-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BACKUP -->
+    <div id="view-backup" class="view fade-in">
+      <div class="section-title">Backup Excel <i class="fa-solid fa-download"></i></div>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="descargarBackupExcel()">Descargar backup `liq`</button>
+      </div>
+      <div class="table-wrap" id="backup-status" style="padding:24px;font-size:14px;color:var(--muted);">
+        <div>Presione el botón para generar y descargar un backup Excel directamente desde Supabase.</div>
+      </div>
+    </div>
+
     <!-- PENDIENTES RECIBO -->
      <div id="view-pendientes-recibo" class="view fade-in">
       <div class="section-title">Pen. Recibo</div>
@@ -592,7 +676,13 @@ const PAGINATION_STATE = {
   registros: { page: 1, pageSize:30 },
   pendientes: { page: 1, pageSize: 30 },
   procesados: { page: 1, pageSize: 30 },
+  liq2025: { page: 1, pageSize: 30 },
+  liq2026: { page: 1, pageSize: 30 },
 };
+
+let TABLE_COUNTS = { liq: 0, liq_2025: 0, liq_2026: 0 };
+let TABLE_CACHE = { liq_2025: [], liq_2026: [] };
+let statsLoaded = false;
 
 function getPageState(view) {
   return PAGINATION_STATE[view] || PAGINATION_STATE.registros;
@@ -651,13 +741,34 @@ function paginateRows(rows, page, pageSize) {
 function getRowCountForView(view) {
   if (view === 'pendientes') return getFilteredPendientes().length;
   if (view === 'procesados') return getFilteredProcesados().length;
+  if (view === 'liq2025') return getFilteredLiqTable('liq_2025').length;
+  if (view === 'liq2026') return getFilteredLiqTable('liq_2026').length;
   return getFiltered().length;
+}
+
+function getFilteredLiqTable(tableName) {
+  const viewKey = tableName.replace('_', '');
+  const searchEl = document.getElementById(`search-${viewKey}`);
+  const searchTerm = normalizar(searchEl?.value || '');
+  const rows = TABLE_CACHE[tableName] || [];
+  if (!searchTerm) return rows;
+  return rows.filter(r => {
+    const esc = normalizarEscritura(r.escritura);
+    const nir = normalizar(String(r.nir || ''));
+    const correo = normalizar(String(r.correo || ''));
+    const gob = normalizar(String(r.gobernacion || ''));
+    return esc.includes(searchTerm) || nir.includes(searchTerm) || correo.includes(searchTerm) || gob.includes(searchTerm);
+  });
 }
 
 function renderCurrentView() {
   if (currentView === 'pendientes') renderPendientes();
   else if (currentView === 'procesados') renderProcesados();
   else if (currentView === 'registros') renderTable();
+  else if (currentView === 'liq2025') renderLiqTable('liq_2025');
+  else if (currentView === 'liq2026') renderLiqTable('liq_2026');
+  else if (currentView === 'consolidado') renderConsolidado();
+  else if (currentView === 'backup') renderBackupView();
   else if (currentView === 'recibos') renderPendientesRecibo();
   else if (currentView === 'calificacion') renderPendientesCTLVer();
   else if (currentView === 'pagos') renderPendientesPagos();
@@ -757,7 +868,7 @@ function getFilteredPendientes() {
   const qEl = document.getElementById('search-pendientes') || { value: '' };
   const q = String(qEl.value || '').trim().toLowerCase();
   const fG = (document.getElementById('filter-pend-gob') || {value:''}).value;
-  let rows = REGISTROS.filter(r => normalizar(r.estado_ctl) !== 'enviado');
+  let rows = REGISTROS.filter(r => normalizar(r.notificacion) === 'enviado');
   if (q) {
     const qNorm = q.normalize('NFD').replace(/[ - ]/g, '');
     rows = rows.filter(r => {
@@ -775,7 +886,7 @@ function getFilteredProcesados() {
   const qEl = document.getElementById('search-procesados') || { value: '' };
   const q = String(qEl.value || '').trim().toLowerCase();
   const fG = (document.getElementById('filter-proc-gob') || {value:''}).value;
-  let rows = REGISTROS.filter(r => normalizar(r.estado_ctl) === 'enviado');
+  let rows = REGISTROS.filter(r => normalizar(r.notificacion) === 'enviado' && normalizar(r.pago) === 'ingresado');
   if (q) {
     const qNorm = q.normalize('NFD').replace(/[ - ]/g, '');
     rows = rows.filter(r => {
@@ -1044,9 +1155,8 @@ function generarCorreoRecibo(reg) {
 // ================================================================
 function filtrarPendientes(registros) {
   return registros.filter(r => {
-    const estadoCtl = normalizar(r.estado_ctl);
-    const pago = normalizar(r.pago);
-    return estadoCtl !== 'enviado' && pago === 'ingresado';
+    const notificacion = normalizar(r.notificacion);
+    return notificacion === 'enviado';
   });
 }
 
@@ -1127,6 +1237,7 @@ async function procesarSeleccionados() {
   const regs = REGISTROS.filter(r => sel.includes(r.escritura));
   const pendientes = filtrarPendientes(regs);
   if (!pendientes.length) { showNotif('Los registros seleccionados ya estan procesados o no cumplen el filtro', 'info'); return; }
+  const targetTable = askTargetLiqTable('liq_2026');
   openModal('modal-proceso');
   const log = document.getElementById('process-log');
   const prog = document.getElementById('proceso-progress');
@@ -1145,6 +1256,9 @@ async function procesarSeleccionados() {
     if (enviado) {
       reg.estado_ctl = 'enviado'; reg.fecha_proceso = new Date().toLocaleString('es-CO');
       try { await updateRegistroOnServer(normalizarEscritura(reg.escritura), { estado_ctl: reg.estado_ctl, fecha_proceso: reg.fecha_proceso }); } catch(e){console.warn(e);}      
+      if (targetTable && normalizar(reg.pago) === 'ingresado' && normalizar(reg.notificacion).includes('enviado')) {
+        await moveRegistroATabla(normalizarEscritura(reg.escritura), targetTable);
+      }
       log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-ok">Escritura ${reg.escritura} enviada</span></div>`;
     } else {
       log.innerHTML += `<div class="log-line"><span class="log-time">${new Date().toLocaleTimeString('es-CO')}</span><span class="log-err">Error envío ${reg.escritura}</span></div>`;
@@ -1162,7 +1276,7 @@ async function procesarSeleccionados() {
 function actualizarUI() {
   const total = REGISTROS.length;
   const pendientes = filtrarPendientes(REGISTROS).length;
-  const procesados = REGISTROS.filter(r => normalizar(r.estado_ctl) === 'enviado').length;
+  const procesados = REGISTROS.filter(r => normalizar(r.notificacion) === 'enviado' && normalizar(r.pago) === 'ingresado').length;
   const docs = Object.values(DOCUMENTOS).flat().length;
   const drafts = Object.keys(BORRADORES).length;
   const pct = total ? Math.round((procesados/total)*1000) : 0;
@@ -1226,6 +1340,20 @@ function actualizarUI() {
   renderProcesados();
   renderDocsList();
   renderMailsList();
+}
+
+function updateLiqStatsUI(stats) {
+  TABLE_COUNTS = stats.table_counts || TABLE_COUNTS;
+  const s25 = TABLE_COUNTS.liq_2025 || 0;
+  const s26 = TABLE_COUNTS.liq_2026 || 0;
+  const sliq = TABLE_COUNTS.liq || 0;
+  const consolidated = s25 + s26;
+  const liq25El = document.getElementById('sb-liq2025'); if(liq25El) liq25El.textContent = s25;
+  const liq26El = document.getElementById('sb-liq2026'); if(liq26El) liq26El.textContent = s26;
+  const consolidadoEl = document.getElementById('sb-consolidado'); if(consolidadoEl) consolidadoEl.textContent = consolidated;
+  const tableLiqEl = document.getElementById('stat-table-liq'); if(tableLiqEl) tableLiqEl.textContent = sliq;
+  const tableLiq25El = document.getElementById('stat-table-liq2025'); if(tableLiq25El) tableLiq25El.textContent = s25;
+  const tableLiq26El = document.getElementById('stat-table-liq2026'); if(tableLiq26El) tableLiq26El.textContent = s26;
 }
 
 function estadoBadge(estado) {
@@ -1368,6 +1496,151 @@ function renderProcesados() {
     </tr>`;
   }).join('');
   renderPagination('procesados', rows.length);
+}
+
+function renderLiqTable(tableName) {
+  const viewKey = tableName.replace('_', '');
+  const tbody = document.getElementById(`${viewKey}-table-body`);
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Cargando registros...</td></tr>';
+  loadLiqTable(tableName);
+}
+
+async function loadLiqTable(tableName) {
+  const viewKey = tableName.replace('_', '');
+  const tbody = document.getElementById(`${viewKey}-table-body`);
+  const pageState = getPageState(viewKey);
+  try {
+    let rows = TABLE_CACHE[tableName] || [];
+    if (!rows.length) {
+      const res = await fetch(`/api/liq/table/${encodeURIComponent(tableName)}?limit=1000&page=1&sort_by=updated_at&desc=true`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      rows = await res.json();
+      if (!Array.isArray(rows)) rows = [];
+      TABLE_CACHE[tableName] = rows;
+    }
+    rows = getFilteredLiqTable(tableName);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No hay registros en esta tabla</td></tr>';
+      const pageBar = document.getElementById(`pagination-${viewKey}`);
+      if (pageBar) pageBar.innerHTML = '';
+      return;
+    }
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageState.pageSize));
+    if (pageState.page > totalPages) pageState.page = totalPages;
+    const pageRows = paginateRows(rows, pageState.page, pageState.pageSize);
+    tbody.innerHTML = pageRows.map(r => {
+      return `<tr>
+        <td class="td-escritura">${r.escritura || '—'}</td>
+        <td class="mono">${r.nir || '—'}</td>
+        <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.correo || ''}">${r.correo || '—'}</td>
+        <td>${pagoBadge(r.pago)}</td>
+        <td>${estadoBadge(r.estado_ctl)}</td>
+        <td>${estadoBadge(r.notificacion)}</td>
+        <td>${gobBadge(r.gobernacion)}</td>
+        <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso || r.updated_at || '—'}</td>
+      </tr>`;
+    }).join('');
+    renderPagination(viewKey, rows.length);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Error cargando tabla: ${escapeHtml(e.message)}</td></tr>`;
+    const pageBar = document.getElementById(`pagination-${viewKey}`);
+    if (pageBar) pageBar.innerHTML = '';
+  }
+}
+
+function limpiarFiltrosLiq(viewKey) {
+  const search = document.getElementById(`search-${viewKey}`);
+  if (search) search.value = '';
+  resetPagination(viewKey);
+  renderCurrentView();
+}
+
+function renderConsolidado() {
+  const body = document.getElementById('consolidado-body');
+  if (!body) return;
+  const liq = TABLE_COUNTS.liq || 0;
+  const liq2025 = TABLE_COUNTS.liq_2025 || 0;
+  const liq2026 = TABLE_COUNTS.liq_2026 || 0;
+  const total = liq2025 + liq2026;
+  body.innerHTML = `
+    <tr><td>liq</td><td>${liq}</td><td><button class="btn btn-ghost btn-sm" onclick="setView('registros', this)">Ver</button></td></tr>
+    <tr><td>liq_2025</td><td>${liq2025}</td><td><button class="btn btn-ghost btn-sm" onclick="setView('liq2025', this)">Ver</button></td></tr>
+    <tr><td>liq_2026</td><td>${liq2026}</td><td><button class="btn btn-ghost btn-sm" onclick="setView('liq2026', this)">Ver</button></td></tr>
+  `;
+  const tableLiqEl = document.getElementById('stat-table-liq'); if (tableLiqEl) tableLiqEl.textContent = liq;
+  const tableLiq25El = document.getElementById('stat-table-liq2025'); if (tableLiq25El) tableLiq25El.textContent = liq2025;
+  const tableLiq26El = document.getElementById('stat-table-liq2026'); if (tableLiq26El) tableLiq26El.textContent = liq2026;
+  const consolidadoEl = document.getElementById('sb-consolidado'); if (consolidadoEl) consolidadoEl.textContent = total;
+}
+
+function renderBackupView() {
+  const status = document.getElementById('backup-status');
+  if (!status) return;
+  status.innerHTML = `<div>Presione el botón de descarga para generar un backup Excel desde Supabase. La descarga se iniciará automáticamente.</div>`;
+}
+
+async function fetchLiqStats() {
+  try {
+    const res = await fetch('/api/liq/stats');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const stats = await res.json();
+    updateLiqStatsUI(stats);
+    return stats;
+  } catch (e) {
+    console.warn('No se pudo cargar estadísticas de liq:', e.message);
+    return null;
+  }
+}
+
+async function descargarBackupExcel() {
+  try {
+    const url = '/api/export/liq/download';
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.click();
+    showNotif('Descarga de backup iniciada', 'success');
+  } catch (e) {
+    showNotif(`Error descargando backup: ${e.message}`, 'error');
+  }
+}
+
+function askTargetLiqTable(defaultValue = 'liq_2026') {
+  const target = window.prompt('Destino de tabla para registros completos (liq_2025 o liq_2026):', defaultValue);
+  if (!target) return null;
+  const clean = target.trim().replace(/\s+/g, '').toLowerCase();
+  if (clean === 'liq_2025' || clean === 'liq_2026') return clean;
+  if (clean === 'liq2025') return 'liq_2025';
+  if (clean === 'liq2026') return 'liq_2026';
+  if (clean === '2025') return 'liq_2025';
+  if (clean === '2026') return 'liq_2026';
+  showNotif('Destino inválido. Use liq_2025 o liq_2026.', 'error');
+  return null;
+}
+
+async function moveRegistroATabla(esc, targetTable = 'liq_2026') {
+  if (!['liq_2025', 'liq_2026'].includes(targetTable)) {
+    showNotif(`Destino inválido: ${targetTable}`, 'error');
+    return false;
+  }
+  try {
+    const res = await fetch(`/api/liq/${encodeURIComponent(esc)}/move?target=${encodeURIComponent(targetTable)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`${res.status} ${err}`);
+    }
+    REGISTROS = REGISTROS.filter(r => normalizarEscritura(r.escritura) !== normalizarEscritura(esc));
+    await fetchLiqStats();
+    actualizarUI();
+    return true;
+  } catch (e) {
+    console.warn('Error moviendo registro:', e);
+    showNotif(`No se pudo mover ${esc} a ${targetTable}`, 'error');
+    return false;
+  }
 }
 
 function renderDocsList() {
@@ -1550,6 +1823,14 @@ async function procesarUno(esc) {
       estado_ctl: reg.estado_ctl,
       fecha_proceso: reg.fecha_proceso,
     });
+    const targetTable = askTargetLiqTable('liq_2026');
+    if (targetTable && normalizar(reg.pago) === 'ingresado' && normalizar(reg.notificacion).includes('enviado') && !normalizar(reg.estado_ctl).includes('pend')) {
+      const moved = await moveRegistroATabla(escNorm, targetTable);
+      if (moved) {
+        showNotif(`Escritura ${escNorm} movida a ${targetTable}`, 'success');
+        return;
+      }
+    }
   } catch (e) {
     showNotif(`Procesado local, pero no se pudo guardar en el servidor: ${e.message}`, 'error');
   }
@@ -2099,6 +2380,7 @@ async function cargarRegistrosDelServidor() {
         r.escritura = normalizarEscritura(r.escritura);
       });
       REGISTROS = data;
+      await fetchLiqStats();
       actualizarUI();
       renderCurrentView();
     }
@@ -2602,15 +2884,7 @@ async function enviarCertificadoBackendUnico(reg) {
 // Primero intentamos cargar datos desde el backend (si existe)
 async function fetchServerData() {
   try {
-    // stats
-    const sRes = await fetch('/api/liq/stats');
-    if (sRes.ok) {
-      const stats = await sRes.json();
-      // poblar contadores parciales inmediatos
-      ['stat-total','sb-total'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=stats.total; });
-      ['stat-pend','sb-pend'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=stats.pendientes; });
-      ['stat-proc','sb-proc'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=stats.procesados; });
-    }
+    await fetchLiqStats();
 
     // cargar todos los registros y poblar REGISTROS
     const allRes = await fetch('/api/liq/all?limit=10000');

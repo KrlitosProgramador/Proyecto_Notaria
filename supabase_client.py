@@ -158,16 +158,40 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
         # y actualiza a 'Enviado'
         estado_final = 'Enviado'
     
+    # Determinar la columna a actualizar según la actividad
+    if activity_type == 'notificacion':
+        field = 'notificacion'
+        estado_final = 'Enviado'
+    elif activity_type == 'pagos':
+        field = 'pago'
+        estado_final = 'Ingresado'
+    elif activity_type == 'cert_download':
+        field = 'estado_ctl'
+        estado_final = 'Descargado'
+    elif activity_type == 'cert_send':
+        field = 'estado_ctl'
+        estado_final = 'Enviado'
+    else:
+        field = 'notificacion'
+
+    update_payload = {field: estado_final}
+
     # Intentar actualizar por la columna `escritura` primero
     try:
-        res = supabase.table("liq").update({"notificacion": estado_final}).eq("escritura", escritura_str).execute()
+        res = supabase.table("liq").update(update_payload).eq("escritura", escritura_str).execute()
         # Si no actualizó, intentar con escritura_str
         count = getattr(res, 'count', None)
         if (count is None and not (res.data and len(res.data) > 0)) or (count == 0):
-            res = supabase.table("liq").update({"notificacion": estado_final}).eq("escritura_str", escritura_str).execute()
-        return res
+            res = supabase.table("liq").update(update_payload).eq("escritura_str", escritura_str).execute()
     except Exception:
-        return supabase.table("liq").update({"notificacion": estado_final}).eq("escritura_str", escritura_str).execute()
+        res = supabase.table("liq").update(update_payload).eq("escritura_str", escritura_str).execute()
+
+    # Intentar mover automáticamente si el registro completó el proceso
+    try:
+        _check_and_move_if_complete(escritura_str)
+    except Exception:
+        pass
+    return res
 
 
 def update_liq_row(escritura_str: str, data: dict):
@@ -203,6 +227,11 @@ def update_liq_row(escritura_str: str, data: dict):
                 res = supabase.table("liq").update(payload).eq("escritura_str", escritura_str).execute()
             else:
                 raise
+    # Intentar mover automáticamente si el registro quedó completo
+    try:
+        _check_and_move_if_complete(escritura_str)
+    except Exception:
+        pass
     return res
 
 def get_certificados_por_usuario(usuario):
@@ -247,15 +276,14 @@ def get_liq_stats():
         raise RuntimeError("Supabase client no configurado.")
 
     # total
-    total_res = supabase.table("liq").select("id", count="exact").limit(1).execute()
+    total_res = supabase.table("liq").select("*", count="exact").execute()
     total = getattr(total_res, "count", None)
     if total is None:
-        # fallback
         total = len(total_res.data or [])
 
     # pago ingresado (case-insensitive)
     pago_res = (
-        supabase.table("liq").select("id", count="exact").filter("pago", "ilike", "Ingresado").limit(1).execute()
+        supabase.table("liq").select("*", count="exact").filter("pago", "ilike", "Ingresado").execute()
     )
     pago_ingresado = getattr(pago_res, "count", None)
     if pago_ingresado is None:
@@ -264,10 +292,9 @@ def get_liq_stats():
     # pendientes (pago ingresado y estado_ctl != 'Enviado')
     pendientes_res = (
         supabase.table("liq")
-        .select("id", count="exact")
+        .select("*", count="exact")
         .filter("pago", "ilike", "Ingresado")
         .filter("estado_ctl", "neq", "Enviado")
-        .limit(1)
         .execute()
     )
     pendientes = getattr(pendientes_res, "count", None)
@@ -277,21 +304,33 @@ def get_liq_stats():
     # procesados (pago ingresado y estado_ctl == 'Enviado')
     procesados_res = (
         supabase.table("liq")
-        .select("id", count="exact")
+        .select("*", count="exact")
         .filter("pago", "ilike", "Ingresado")
         .filter("estado_ctl", "ilike", "Enviado")
-        .limit(1)
         .execute()
     )
     procesados = getattr(procesados_res, "count", None)
     if procesados is None:
         procesados = len(procesados_res.data or [])
 
+    table_counts = {}
+    for table_name in ['liq', 'liq_2025', 'liq_2026']:
+        try:
+            if check_table_exists(table_name):
+                count_res = supabase.table(table_name).select('*', count='exact').execute()
+                count = getattr(count_res, 'count', None)
+                table_counts[table_name] = count if count is not None else len(count_res.data or [])
+            else:
+                table_counts[table_name] = 0
+        except Exception:
+            table_counts[table_name] = 0
+
     return {
         "total": total,
         "pago_ingresado": pago_ingresado,
         "pendientes": pendientes,
         "procesados": procesados,
+        "table_counts": table_counts,
     }
 
 
@@ -510,5 +549,163 @@ def marcar_descarga_como_enviada(descarga_id: str):
         "enviado": True,
         "fecha_envio": datetime.datetime.utcnow().isoformat()
     }).eq("id", descarga_id).execute()
+
+
+def _get_row_by_escritura(table_name: str, escritura: str):
+    """Obtiene una fila por `escritura` o `escritura_str` normalizada."""
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    escritura_norm = normalize_escritura(escritura)
+    query = supabase.table(table_name).select("*")
+    # Primero intenta por la columna original
+    res = query.eq("escritura", escritura).limit(1).execute()
+    if res.data:
+        return res.data[0]
+    # Luego por escritura_str normalizada
+    if escritura_norm:
+        res2 = supabase.table(table_name).select("*").eq("escritura_str", escritura_norm).limit(1).execute()
+        if res2.data:
+            return res2.data[0]
+    return None
+
+
+def _is_liq_row_complete(row: dict) -> bool:
+    """Determina heurísticamente si una fila de `liq` está completa.
+
+    Criterio (configurable aquí):
+    - `notificacion` contiene 'enviado'
+    - `pago` no contiene 'ingres' (case-insensitive)
+    - `estado_ctl` no contiene 'pend' ni 'pendiente'
+    """
+    if not row:
+        return False
+    def _val(k):
+        v = row.get(k)
+        return (str(v).lower() if v is not None else "")
+
+    notif = _val('notificacion')
+    pago = _val('pago')
+    estado_ctl = _val('estado_ctl')
+
+    if 'enviado' not in notif:
+        return False
+    if 'ingresado' not in pago and 'pagado' not in pago:
+        return False
+    if 'pend' in estado_ctl or 'pendiente' in estado_ctl:
+        return False
+    return True
+
+
+def move_liq_to_table(escritura: str, target_table: str):
+    """Mueve (copia y borra) un registro de `liq` a `target_table`.
+
+    Retorna el resultado de la inserción en la tabla destino.
+    """
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    # verificar tabla destino
+    if not check_table_exists(target_table):
+        raise RuntimeError(f"Tabla destino no existe: {target_table}")
+
+    row = _get_row_by_escritura('liq', escritura)
+    if not row:
+        raise RuntimeError(f"Registro con escritura {escritura} no encontrado en tabla liq")
+
+    # Preparar payload para insertar (eliminar id si existe)
+    payload = row.copy()
+    payload.pop('id', None)
+
+    # Añadir fecha_proceso si no existe
+    import datetime
+    payload.setdefault('fecha_proceso', datetime.datetime.utcnow().isoformat())
+
+    # Insertar en la tabla destino
+    res = supabase.table(target_table).insert(payload).execute()
+
+    # Si se insertó correctamente, eliminar el original
+    try:
+        # obtener id original si quedó
+        original_id = row.get('id')
+        if original_id:
+            supabase.table('liq').delete().eq('id', original_id).execute()
+        else:
+            # intentar borrar por escritura
+            supabase.table('liq').delete().eq('escritura', escritura).execute()
+    except Exception as e:
+        print(f"[WARNING] No se pudo borrar registro original en liq: {e}")
+
+    return res
+
+
+def _check_and_move_if_complete(escritura: str, target_table: str = 'liq_2026'):
+    """Chequea si un registro está completo y lo mueve a `target_table` si aplica."""
+    try:
+        row = _get_row_by_escritura('liq', escritura)
+        if not row:
+            return None
+        if _is_liq_row_complete(row):
+            return move_liq_to_table(escritura, target_table)
+    except Exception as e:
+        print(f"[WARNING] Error al verificar/mover escritura {escritura}: {e}")
+    return None
+
+
+def export_liq_to_excel(out_dir: str = None) -> str:
+    """Exporta las tablas `liq`, `liq_2025` y `liq_2026` a un archivo Excel con varias hojas."""
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    try:
+        import pandas as pd
+        import tempfile
+        from pathlib import Path
+
+        def _fetch_table_df(name: str):
+            if not check_table_exists(name):
+                return pd.DataFrame()
+            res = supabase.table(name).select('*').execute()
+            rows = res.data or []
+            df = pd.DataFrame(rows)
+            if df.empty:
+                return pd.DataFrame({'message': [f'No hay filas en tabla {name}']})
+            return df
+
+        sheets = {
+            'liq': _fetch_table_df('liq'),
+            'liq_2025': _fetch_table_df('liq_2025'),
+            'liq_2026': _fetch_table_df('liq_2026'),
+        }
+
+        if out_dir:
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx', dir=(out_dir or None))
+        tmp.close()
+
+        with pd.ExcelWriter(tmp.name, engine='openpyxl') as writer:
+            for sheet_name, df in sheets.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        return tmp.name
+    except Exception as e:
+        raise RuntimeError(f"Error exportando las tablas liq a Excel: {e}")
+
+
+def get_table_rows(table_name: str, limit: int = 1000, page: int = 1, sort_by: str = None, desc: bool = True):
+    """Obtiene filas de cualquier tabla permitida con paginación mínima."""
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+    if not check_table_exists(table_name):
+        raise RuntimeError(f"Tabla no existe: {table_name}")
+    limit = max(1, min(limit, MAX_PAGE_SIZE))
+    page = max(1, page)
+    query = supabase.table(table_name).select("*")
+    if sort_by:
+        try:
+            query = query.order(sort_by, desc=desc)
+        except Exception:
+            pass
+    start = (page - 1) * limit
+    end = start + limit - 1
+    query = query.range(start, end)
+    return query.execute()
 
 
