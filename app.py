@@ -36,6 +36,8 @@ try:
     from .supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
     from .supabase_client import get_liq_stats
     from .supabase_client import get_all_liq, get_processed_liq
+    from .supabase_client import move_liq_to_table, export_liq_to_excel
+    from .supabase_client import get_table_rows
 except ImportError:
     # Fallback a importación absoluta (cuando se ejecuta directamente con uvicorn)
     from supabase_client import (
@@ -57,6 +59,8 @@ except ImportError:
     from supabase_client import insert_liq_row, update_liq_row, get_pending_liq, update_liq_estado_by_escritura
     from supabase_client import get_liq_stats
     from supabase_client import get_all_liq, get_processed_liq
+    from supabase_client import move_liq_to_table, export_liq_to_excel
+    from supabase_client import get_table_rows
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(APP_DIR, "static")
@@ -164,6 +168,41 @@ def _run_certificados_job(job_id: str):
         else:
             JOBS[job_id]["status"] = "error"
             _append(job_id, f"[ERROR] certificados.py terminó con código {proc.returncode}")
+
+    except Exception as e:
+        JOBS[job_id]["status"] = "error"
+        _append(job_id, f"[EXCEPTION] {type(e).__name__}: {e}")
+
+
+def _run_script_job(job_id: str, script_name: str, args: list = None):
+    """Helper genérico para ejecutar scripts Python en background y capturar logs."""
+    try:
+        JOBS[job_id]["status"] = "running"
+        script_path = os.path.join(APP_DIR, script_name)
+
+        cmd = [sys.executable, script_path]
+        if args:
+            cmd.extend(args)
+
+        proc = subprocess.Popen(
+            cmd,
+            cwd=APP_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+        for line in proc.stdout:
+            _append(job_id, line)
+
+        proc.wait()
+        JOBS[job_id]["returncode"] = proc.returncode
+        if proc.returncode == 0:
+            JOBS[job_id]["status"] = "done"
+        else:
+            JOBS[job_id]["status"] = "error"
+            _append(job_id, f"[ERROR] {script_name} terminó con código {proc.returncode}")
 
     except Exception as e:
         JOBS[job_id]["status"] = "error"
@@ -312,6 +351,24 @@ def liq_processed(limit: int = 10000, page: int = 1, sort_by: str = 'fecha_proce
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get('/api/liq/table/{table_name}')
+def liq_table(table_name: str, limit: int = 1000, page: int = 1, sort_by: str = None, desc: bool = True):
+    """Devuelve filas de tablas `liq` específicas (solo listas permitidas)."""
+    try:
+        allowed = {'liq', 'liq_2025', 'liq_2026', 'pagos_2026', 'pagos_consolidado'}
+        if table_name not in allowed:
+            raise HTTPException(status_code=400, detail=f"Tabla no permitida: {table_name}")
+        if not get_supabase():
+            raise HTTPException(status_code=503, detail="Supabase no configurado. Verifique SUPABASE_URL y SUPABASE_KEY en .env")
+        res = get_table_rows(table_name, limit=limit, page=page, sort_by=sort_by, desc=desc)
+        return res.data
+    except HTTPException:
+        raise
+    except Exception as e:
+        insert_log('consulta_tabla_liq', str(e), 'sistema', 'error')
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/liq/{escritura}/mark")
 def mark_escritura(escritura: str, estado: str, activity_type: str = None):
     try:
@@ -404,7 +461,7 @@ def _run_envio_recibos_job(job_id: str):
 def start_envio_recibos():
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {"status": "queued", "logs": [], "returncode": None}
-    t = threading.Thread(target=_run_envio_recibos_job, args=(job_id,), daemon=True)
+    t = threading.Thread(target=_run_script_job, args=(job_id, 'envio_recibos.py'), daemon=True)
     t.start()
     return {"job_id": job_id}
 
@@ -484,7 +541,7 @@ def _run_envio_certificados_job(job_id: str):
 def start_envio_certificados():
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {"status": "queued", "logs": [], "returncode": None}
-    t = threading.Thread(target=_run_envio_certificados_job, args=(job_id,), daemon=True)
+    t = threading.Thread(target=_run_script_job, args=(job_id, 'envio_certificados.py'), daemon=True)
     t.start()
     return {"job_id": job_id}
 
@@ -882,15 +939,22 @@ def start_devoluciones():
 
 @app.post('/api/export/liq')
 def export_liq_backup():
-    """Genera un backup Excel de la tabla `liq` usando certificados_supabase.
-    Retorna la ruta del archivo generado en el servidor, si está disponible.
-    """
-    if not certificados_supabase:
-        raise HTTPException(status_code=500, detail="Módulo certificados_supabase no disponible")
+    """Genera un backup Excel de la tabla `liq` y devuelve el archivo generado."""
     try:
-        ruta = certificados_supabase.exportar_backup_excel()
+        ruta = export_liq_to_excel()
         insert_log('export_liq', f'Backup generado: {ruta}', 'sistema')
         return {"status": "ok", "path": ruta}
     except Exception as e:
         insert_log('export_liq_error', str(e), 'sistema', 'error')
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/api/export/liq/download')
+def download_liq_backup():
+    try:
+        ruta = export_liq_to_excel()
+        insert_log('download_liq', f'Backup descargado: {ruta}', 'sistema')
+        return FileResponse(ruta, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename=os.path.basename(ruta))
+    except Exception as e:
+        insert_log('download_liq_error', str(e), 'sistema', 'error')
         raise HTTPException(status_code=500, detail=str(e))
