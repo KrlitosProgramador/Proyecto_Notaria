@@ -1,14 +1,53 @@
-import os, sys, time, re, subprocess, hashlib
+# -*- coding: utf-8 -*-
+"""
+certificados_supabase.py
+
+Conversión de certificados.py para usar Supabase como fuente principal de datos.
+
+CAMBIO PRINCIPAL:
+- ANTES: leía Informe.xlsx y filtraba localmente.
+- AHORA: consulta la tabla `liq` en Supabase y usa esa data como verdad.
+- EXTRA: puede exportar una copia de respaldo a Excel al final del día.
+
+Uso:
+    python certificados_supabase.py
+    python certificados_supabase.py --exportar-excel
+    python certificados_supabase.py --solo-listar
+
+Requisitos:
+    - .env configurado con SUPABASE_URL y SUPABASE_KEY (usado por supabase_client.get_supabase)
+    - Tabla 'liq' en Supabase con columnas mínimas: escritura, nir, estado_ctl, pago
+    - (Opcional) funciones del módulo supabase_client para registrar descargas o logs
+
+NOTA IMPORTANTE:
+Este archivo migra COMPLETAMENTE la capa de lectura/validación desde Excel hacia Supabase.
+La automatización Selenium se deja lista para integrarse en `procesar_una_escritura()`.
+Si ya tienes selectores y lógica de descarga en tu certificados.py original, puedes pegarlos ahí.
+"""
+import os, subprocess, re, time, hashlib, sys
+import argparse
 import pandas as pd
+
+from urllib.parse import quote_plus
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.edge.options import Options
+from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.edge.service import Service
+from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver import ActionChains
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, SessionNotCreatedException, StaleElementReferenceException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    SessionNotCreatedException,
+    StaleElementReferenceException,
+)
 from supabase_client import (
     insert_certificado,
     insert_log,
@@ -21,203 +60,424 @@ from supabase_client import (
     get_pending_certificados_liq,
 )
 
-# --- HELPERS PARA CLIC ROBUSTO ---
 
-def find_in_iframes(driver, by, locator, timeout=2):
-    """Intenta localizar elemento en el main document, si falla recorre iframes"""
+# Selenium
+
+from supabase import ClientOptions, create_client, Client
+
+# =========================
+# CONFIG
+# =========================
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_FOLDER = os.path.join(APP_DIR, "descargas", "certificados")
+DRIVER_PATH = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
+BACKUP_DIR = os.path.join(APP_DIR, "backups")
+TABLE_NAME = "liq"
+WAIT_SECONDS = 20
+
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    # fall back to empty client placeholder to avoid crashes during import
+    supabase: Client | None = None
+else:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def get_supabase() -> Client:
+    return supabase
+
+def create_client(
+    supabase_url: str,
+    supabase_key: str,
+    options: Optional[ClientOptions] = None,
+) -> Client:
+    """Create client function to instantiate supabase client like JS runtime.
+
+    Parameters
+    ----------
+    supabase_url: str
+        The URL to the Supabase instance that should be connected to.
+    supabase_key: str
+        The API key to the Supabase instance that should be connected to.
+    **options
+        Any extra settings to be optionally specified - also see the
+        `DEFAULT_OPTIONS` dict.
+
+    Examples
+    --------
+    Instantiating the client.
+    >>> import os
+    >>> from supabase import create_client, Client
+    >>>
+    >>> url: str = os.environ.get("SUPABASE_TEST_URL")
+    >>> key: str = os.environ.get("SUPABASE_TEST_KEY")
+    >>> supabase: Client = create_client(url, key)
+
+    Returns
+    -------
+    Client
+    """
+    return Client.create(
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+    )
+# =========================
+# HELPERS GENERALES
+# =========================
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def normalizar_texto(valor: Any) -> str:
+    if valor is None:
+        return ""
+    txt = str(valor).strip()
+    if txt.lower() == "nan":
+        return ""
+    return txt
+
+
+def normalizar_numero_excel(valor: Any) -> str:
+    txt = normalizar_texto(valor)
+    return txt[:-2] if txt.endswith(".0") else txt
+
+
+def preparar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.lower()
+        .str.replace("á", "a")
+        .str.replace("é", "e")
+        .str.replace("í", "i")
+        .str.replace("ó", "o")
+        .str.replace("ú", "u")
+        .str.replace("\n", " ")
+        .str.replace("\r", "")
+    )
+
+    # Normalizaciones defensivas
+    for col in ["estado_ctl", "pago", "escritura", "nir", "notificacion"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    df["estado_ctl"] = df["estado_ctl"].fillna("").astype(str).str.strip().str.lower()
+    df["notificacion"] = df["notificacion"].fillna("").astype(str).str.strip().str.lower()
+    df["pago"] = df["pago"].fillna("").astype(str).str.strip().str.lower()
+    df["escritura_str"] = df["escritura"].apply(normalizar_numero_excel)
+    df["nir_str"] = df["nir"].apply(normalizar_numero_excel)
+    return df
+
+
+# =========================
+# SUPABASE
+# =========================
+def get_supabase_client():
+    supabase = get_supabase()
+    if not supabase:
+        raise RuntimeError(
+            "No se pudo crear el cliente de Supabase. Revisa SUPABASE_URL y SUPABASE_KEY en tu .env"
+        )
+    return supabase
+
+
+def obtener_registros_desde_supabase() -> pd.DataFrame:
+    """
+    Trae datos desde Supabase y hace el filtro en pandas para ser más robusto
+    frente a mayúsculas/minúsculas y valores inconsistentes.
+    """
+    supabase = get_supabase_client()
+    result = supabase.table(TABLE_NAME).select("*").execute()
+    data = result.data or []
+    df = pd.DataFrame(data)
+    df = preparar_dataframe(df)
+    return df
+
+
+def obtener_pendientes_desde_supabase() -> pd.DataFrame:
+    """
+    Reemplaza completamente el viejo filtro desde Excel.
+    ANTES:
+        (estado_ctl != 'enviado') and (pago == 'ingresado')
+    AHORA:
+        mismo criterio pero leyendo desde Supabase.
+    """
+    df = obtener_registros_desde_supabase()
+    if df.empty:
+        return df
+
+    filtro = (
+        (df["estado_ctl"] != "enviado")
+        & (df["pago"] == "ingresado")
+        & (df["escritura_str"] != "")
+        & (df["nir_str"] != "")
+    )
+    return df.loc[filtro].copy()
+
+
+def actualizar_estado_liq(escritura: str, nuevo_estado: str) -> None:
+    supabase = get_supabase_client()
+    supabase.table(TABLE_NAME).update({"estado_ctl": nuevo_estado}).eq("escritura", escritura).execute()
+
+
+def registrar_error_liq(escritura: str, mensaje_error: str) -> None:
+    """
+    Si tu tabla tiene columna error_detalle, la llena.
+    Si no existe, el try evita romper el proceso.
+    """
     try:
-        return driver.find_element(by, locator)
-    except NoSuchElementException:
-        frames = driver.find_elements(By.TAG_NAME, "iframe")
-        for i, f in enumerate(frames):
-            try:
-                driver.switch_to.frame(f)
-                try:
-                    el = driver.find_element(by, locator)
-                    return el
-                except NoSuchElementException:
-                    driver.switch_to.default_content()
-                    continue
-            except Exception:
-                driver.switch_to.default_content()
+        supabase = get_supabase_client()
+        supabase.table(TABLE_NAME).update({
+            "estado_ctl": "error",
+            "error_detalle": mensaje_error[:400],
+        }).eq("escritura", escritura).execute()
+    except Exception:
+        pass
+
+
+def registrar_descarga(escritura: str, nir: str, nombre_archivo: str, ruta_archivo: str) -> None:
+    """
+    Registra metadatos en una tabla de descargas si existe.
+    Si la tabla/columnas no existen, no rompe el flujo.
+    """
+    try:
+        supabase = get_supabase_client()
+        payload = {
+            "escritura": escritura,
+            "nir": nir,
+            "archivo": nombre_archivo,
+            "ruta_local": ruta_archivo,
+            "tipo": "certificado",
+            "fecha_registro": datetime.now().isoformat(),
+        }
+        supabase.table("descargas").insert(payload).execute()
+    except Exception:
+        pass
+
+
+def exportar_backup_excel(nombre_archivo: Optional[str] = None) -> str:
+    df = obtener_registros_desde_supabase()
+    if nombre_archivo is None:
+        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_archivo = f"backup_liq_{fecha}.xlsx"
+    output_path = os.path.join(BACKUP_DIR, nombre_archivo)
+    df.to_excel(output_path, index=False, engine="openpyxl")
+    return output_path
+
+
+# =========================
+# ARCHIVOS LOCALES
+# =========================
+def obtener_escrituras_descargadas(carpeta: str) -> set:
+    descargadas = set()
+    if not os.path.exists(carpeta):
+        return descargadas
+
+    for archivo in os.listdir(carpeta):
+        nombre_sin_ext = os.path.splitext(archivo)[0]
+        escritura = nombre_sin_ext.split('_')[0] if '_' in nombre_sin_ext else nombre_sin_ext.split(' ')[0]
+        if escritura:
+            descargadas.add(escritura)
+    return descargadas
+
+
+def esperar_descarga_pdf(carpeta: str, started_at: float, timeout: int = 120) -> Optional[str]:
+    """Espera un PDF nuevo/actualizado después de started_at."""
+    fin = time.time() + timeout
+    while time.time() < fin:
+        candidatos = []
+        for f in os.listdir(carpeta):
+            path = os.path.join(carpeta, f)
+            if not os.path.isfile(path):
                 continue
-        driver.switch_to.default_content()
-        raise NoSuchElementException(f"Elemento no encontrado por {by}={locator}")
-
-def robust_click(driver, wait, by, locator, screenshot_path=None):
-    """Intenta click robusto: espera, JS click, ActionChains, busca en iframes o por atributo onclick."""
-    # 1) espera clickable
-    try:
-        el = wait.until(EC.element_to_be_clickable((by, locator)))
-        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-        try:
-            el.click()
-            return True
-        except Exception:
-            pass
-    except TimeoutException:
-        pass
-
-    # 2) fallback: localizar incluso dentro de iframes
-    try:
-        el = find_in_iframes(driver, by, locator)
-        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-        try:
-            driver.execute_script("arguments[0].click();", el)
-            return True
-        except Exception:
-            pass
-        try:
-            ActionChains(driver).move_to_element(el).click().perform()
-            return True
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    # 3) fallback por atributo onclick específico
-    try:
-        css = "[onclick*='formModalFases:j_idt112:0:j_idt113']"
-        el2 = driver.find_element(By.CSS_SELECTOR, css)
-        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el2)
-        try:
-            driver.execute_script("arguments[0].click();", el2)
-            return True
-        except Exception:
-            pass
-        try:
-            ActionChains(driver).move_to_element(el2).click().perform()
-            return True
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    # 4) si falla, screenshot y retorno False
-    if screenshot_path:
-        try:
-            driver.save_screenshot(screenshot_path)
-        except Exception:
-            pass
-    return False
+            if not f.lower().endswith(".pdf"):
+                continue
+            if os.path.getmtime(path) >= started_at:
+                candidatos.append(path)
+        if candidatos:
+            candidatos.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            return candidatos[0]
+        time.sleep(1)
+    return None
 
 
-def obtener_version_edge():
-    """Devuelve la versión de Edge instalada, o None si no se puede obtener."""
+# =========================
+# SELENIUM / EDGE
+# =========================
+def obtener_version_edge() -> Optional[str]:
     posibles_rutas = [
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     ]
     for ruta in posibles_rutas:
         if os.path.isfile(ruta):
-            try:
-                salida = subprocess.check_output([ruta, "--version"], stderr=subprocess.STDOUT, text=True)
-                match = re.search(r"(\d+\.\d+\.\d+\.\d+)", salida)
-                if match:
-                    return match.group(1)
-            except Exception:
-                continue
+            return ruta
     return None
 
-def obtener_version_driver(ruta_driver):
-    """Devuelve la versión de msedgedriver si el ejecutable existe."""
-    if not os.path.isfile(ruta_driver):
-        return None
-    try:
-        salida = subprocess.check_output([ruta_driver, "--version"], stderr=subprocess.STDOUT, text=True)
-        match = re.search(r"(\d+\.\d+\.\d+\.\d+)", salida)
-        if match:
-            return match.group(1)
-    except Exception:
-        pass
-    return None
 
-def iniciar_edge_driver(ruta_driver, opciones):
-    """Crea el driver de Edge, con comprobación de versión y fallback si el driver es incompatible."""
-    version_edge = obtener_version_edge()
-    version_driver = obtener_version_driver(ruta_driver)
+def crear_driver() -> webdriver.Edge:
+    edge_options = Options()
+    edge_options.use_chromium = True
+    edge_options.add_argument("--disable-gpu")
+    edge_options.add_argument("--no-sandbox")
+    edge_options.add_argument("--headless=new")
+    edge_options.add_argument("--disable-blink-features=AutomationControlled")
+    prefs = {
+        "download.default_directory": DOWNLOAD_FOLDER,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "profile.managed_default_content_settings.pdfs": 2,
+        "pdfjs.disabled": True,
+        "safebrowsing.enabled": False,
+        "profile.default_content_settings.popups": 0,
+    }
+    edge_options.add_experimental_option("prefs", prefs)
+    edge_options.add_experimental_option("useAutomationExtension", False)
 
-    if version_edge and version_driver:
-        if version_edge.split(".")[0] != version_driver.split(".")[0]:
-            print(f"Version mismatch: Edge {version_edge} / EdgeDriver {version_driver}")
-        else:
-            print(f"Versiones compatibles: Edge {version_edge} / EdgeDriver {version_driver}")
-
-    if os.path.isfile(ruta_driver):
-        service = Service(ruta_driver)
-        try:
-            return webdriver.Edge(service=service, options=opciones)
-        except SessionNotCreatedException as e:
-            print(f"[ERROR] El msedgedriver local no es compatible con el Edge instalado.")
-            print(f"[INFO] Intenta actualizar el msedgedriver o usa Selenium Manager para obtener la versión correcta.")
-        except Exception as e:
-            print(f"[ERROR] Error al iniciar Edge con driver local: {e}")
-            print(f"[INFO] Intentando iniciar Edge sin especificar driver local (Selenium Manager)")
-        return webdriver.Edge(options=opciones)
+    service = Service(DRIVER_PATH) if os.path.isfile(DRIVER_PATH) else None
+    if service:
+        driver = webdriver.Edge(service=service, options=edge_options)
     else:
-        return webdriver.Edge(options=opciones)
+        driver = webdriver.Edge(options=edge_options)
+    return driver
 
-# --- CONFIGURACIÓN INICIAL ---
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-download_folder = os.path.join(APP_DIR, "descargas", "certificados")
-# ruta del fichero
-ruta_xlsx = os.path.join(APP_DIR, "Informe.xlsx")
 
-# Ruta local del driver (si existe)
-ruta_edgedriver = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
+# =========================
+# PROCESO DE DESCARGA
+# =========================
+def buscar_y_descargar_certificado(driver: webdriver.Edge, wait: WebDriverWait, escritura: str, nir: str) -> List[str]:
+    """
+    Aquí debes conservar o pegar la lógica Selenium específica de tu portal.
 
-# Crear carpeta de descargas si no existe
-os.makedirs(download_folder, exist_ok=True)
+    Este método devuelve la lista de archivos descargados para una escritura.
+    Para no romper tu aprendizaje, te dejo una versión-base segura:
+    - abre el portal que ya uses
+    - espera descarga
+    - renombra archivo si quieres
 
-print(f"[INFO] Carpeta de descargas: {download_folder}")
+    Si ya tenías selectores funcionando en certificados.py, pégalos aquí.
+    """
 
-# Validar el archivo Excel solo como respaldo; si no existe, seguimos con Supabase
-if not os.path.exists(ruta_xlsx):
-    print(f"[WARN] Archivo Excel no encontrado: {ruta_xlsx}. Se usará Supabase como fuente principal.")
-    hoja = "Liq."
-else:
-    if not os.path.exists(download_folder):
-        os.makedirs(download_folder)
-        print(f"[INFO] Carpeta creada")
+    # ===== EJEMPLO BASE / PLANTILLA =====
+    # Reemplaza esta URL por la del portal donde consultas certificados.
+    # driver.get("https://TU_PORTAL_CERTIFICADOS")
+    # ... aquí irían tus send_keys / clicks / búsqueda por escritura o NIR ...
+    
+    """
+    Busca certificados por NIR y descarga los archivos asociados.
+    Regresa una lista con las rutas completas descargadas.
+    """
 
-    # Determinar la hoja del Excel
+    log(f"[INFO] Abriendo portal de radicación...")
+    driver.get("https://radicacion.supernotariado.gov.co/app/inicio.dma")
+
+    log("[INFO] Buscando menú 'Certificados'...")
+    wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Certificados"))).click()
+    time.sleep(2)
+
+    log(f"[INFO] Ingresando NIR: {nir}")
+    input_nir = wait.until(EC.presence_of_element_located((By.ID, "formSearch:j_idt44")))
+    input_nir.clear()
+    input_nir.send_keys(nir)
+
+    log("[INFO] Ejecutando búsqueda...")
+    boton_buscar = wait.until(EC.element_to_be_clickable((By.ID, "formSearch:j_idt45")))
+    boton_buscar.click()
+    time.sleep(3)
+
+    log("[INFO] Descargando archivos...")
+    archivos_descargados = descargar_multiples_archivos(driver, wait, escritura)
+
+    if not archivos_descargados:
+        raise RuntimeError(f"No se descargó ningún archivo para la escritura {escritura}")
+
+    rutas_finales = []
+
+    for fname in archivos_descargados:
+        # Si descargar_multiples_archivos ya regresa ruta completa, úsala tal cual
+        if os.path.isabs(fname):
+            ruta_archivo = fname
+        else:
+            ruta_archivo = os.path.join(DOWNLOAD_FOLDER, fname)
+
+        if not os.path.exists(ruta_archivo):
+            log(f"[WARN] El archivo reportado no existe: {ruta_archivo}")
+            continue
+
+        rutas_finales.append(ruta_archivo)
+
+    if not rutas_finales:
+        raise RuntimeError(f"Se reportaron descargas, pero no se encontraron archivos válidos para {escritura}")
+
+    log(f"[OK] Se descargaron {len(rutas_finales)} archivo(s) para escritura {escritura}")
+    return rutas_finales
+
+
+    # =====================================================
+    # IMPORTANTE:
+    # Si pegas tu lógica original, asegúrate de dejar `started_at = time.time()`
+    # justo antes del clic que dispara la descarga.
+    # =====================================================
+
+    archivo_descargado = esperar_descarga_pdf(DOWNLOAD_FOLDER, started_at, timeout=120)
+    if not archivo_descargado:
+        raise RuntimeError("No se detectó ninguna descarga PDF para esta escritura")
+
+    nombre_final = f"{escritura}_{nir}.pdf"
+    destino = os.path.join(DOWNLOAD_FOLDER, nombre_final)
+
+    # Si el nombre final ya existe, genera sufijo para no pisarlo
+    if os.path.exists(destino):
+        base, ext = os.path.splitext(destino)
+        i = 2
+        while os.path.exists(f"{base}_{i}{ext}"):
+            i += 1
+        destino = f"{base}_{i}{ext}"
+
+    if os.path.abspath(archivo_descargado) != os.path.abspath(destino):
+        os.replace(archivo_descargado, destino)
+
+    return [destino]
+
+
+def procesar_una_escritura(driver: webdriver.Edge, wait: WebDriverWait, row: pd.Series) -> bool:
+    escritura = normalizar_numero_excel(row.get("escritura"))
+    nir = normalizar_numero_excel(row.get("nir"))
+
+    if not escritura or not nir:
+        log(f"[SKIP] Registro inválido. escritura='{escritura}' nir='{nir}'")
+        return False
+
     try:
-        xls = pd.ExcelFile(ruta_xlsx)
-        hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
-        print(f"[INFO] Hoja a usar: {hoja}")
+        log(f"[INFO] Procesando escritura={escritura} | nir={nir}")
+
+        archivos_generados = buscar_y_descargar_certificado(driver, wait, escritura, nir)
+
+        for archivo in archivos_generados:
+            registrar_descarga(
+                escritura=escritura,
+                nir=nir,
+                nombre_archivo=os.path.basename(archivo),
+                ruta_archivo=archivo,
+            )
+
+        actualizar_estado_liq(escritura, "descargado")
+        log(f"[OK] Escritura {escritura} marcada como descargado en Supabase")
+
+        return True
+
     except Exception as e:
-        print(f"[WARN] No se pudo leer el archivo Excel: {str(e)}")
-        print("[WARN] Se continuará con Supabase como fuente principal.")
-        hoja = "Liq."
+        msg = str(e)
+        registrar_error_liq(escritura, msg)
+        log(f"[ERROR] Escritura {escritura}: {msg}")
+        return False
 
-# --- CONFIGURACIÓN DE EDGE ---
-edge_options = Options()
-edge_options.use_chromium = True
-edge_options.add_argument("--disable-gpu")
-edge_options.add_argument("--no-sandbox")
-edge_options.add_argument("--headless=new")
-edge_options.add_argument("--disable-blink-features=AutomationControlled")
-prefs = {
-    "download.default_directory": download_folder,
-    "download.prompt_for_download": False,
-    "download.directory_upgrade": True,
-    "profile.managed_default_content_settings.pdfs": 2,
-    "pdfjs.disabled": True,
-    "safebrowsing.enabled": False,
-    "profile.default_content_settings.popups": 0,
-}
-edge_options.add_experimental_option("prefs", prefs)
-edge_options.add_experimental_option("useAutomationExtension", False)
-
-service = Service(ruta_edgedriver) if os.path.isfile(ruta_edgedriver) else None
-try:
-    driver = iniciar_edge_driver(ruta_edgedriver, edge_options)
-except Exception as e:
-    raise RuntimeError(f"Error al iniciar EdgeDriver: {e}") from e
-
-wait = WebDriverWait(driver, 10)
-
-# --- FUNCIÓN PARA DESCARGAR MÚLTIPLES ARCHIVOS ---
 def descargar_multiples_archivos(driver, wait, escritura, timeout=120):
     """
     Busca y descarga TODOS los archivos disponibles para una escritura.
@@ -294,7 +554,6 @@ def descargar_multiples_archivos(driver, wait, escritura, timeout=120):
     
     return archivos_descargados
 
-# --- FUNCIÓN PARA DESCARGAR PDF CON CTRL+S (COMPATIBILIDAD) ---
 def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
     """
     Espera un archivo descargado (pdf o crdownload) creado/modificado después de started_at,
@@ -309,8 +568,8 @@ def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
     # 1) Esperar a que aparezca algo nuevo/modificado tras started_at
     while time.time() - t0 < timeout:
         archivos = []
-        for f in os.listdir(download_folder):
-            ruta = os.path.join(download_folder, f)
+        for f in os.listdir(DOWNLOAD_FOLDER):
+            ruta = os.path.join(DOWNLOAD_FOLDER, f)
             if not os.path.isfile(ruta):
                 continue
             try:
@@ -343,7 +602,7 @@ def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
                 break
         else:
             # esperar a que no haya crdownload en la carpeta
-            if not any(x.lower().endswith(".crdownload") for x in os.listdir(download_folder)):
+            if not any(x.lower().endswith(".crdownload") for x in os.listdir(DOWNLOAD_FOLDER)):
                 break
         time.sleep(0.3)
 
@@ -377,7 +636,7 @@ def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
         return False
 
     # 4) Renombrar con retry (por bloqueo)
-    destino = os.path.join(download_folder, nombre_final)
+    destino = os.path.join(DOWNLOAD_FOLDER, nombre_final)
     if os.path.abspath(candidato) == os.path.abspath(destino):
         print(f"[INFO] Ya estaba con el nombre: {nombre_final}")
         return True
@@ -396,8 +655,8 @@ def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
     candidato_hash = file_hash(candidato)
     if candidato_hash:
         # Buscar si ya existe un archivo con mismo hash en la carpeta
-        for f in os.listdir(download_folder):
-            existing = os.path.join(download_folder, f)
+        for f in os.listdir(DOWNLOAD_FOLDER):
+            existing = os.path.join(DOWNLOAD_FOLDER, f)
             if os.path.abspath(existing) == os.path.abspath(candidato):
                 continue
             if not os.path.isfile(existing):
@@ -459,290 +718,76 @@ def esperar_descarga_y_renombrar(nombre_final, started_at, timeout=60):
 
     print("[ERROR] No se pudo renombrar por bloqueo del archivo (PermissionError).")
     return False
+# =========================
+# MAIN
+# =========================
+def main():
+    parser = argparse.ArgumentParser(description="Descarga certificados usando Supabase como fuente principal")
+    parser.add_argument("--solo-listar", action="store_true", help="Solo muestra pendientes y no descarga")
+    parser.add_argument("--exportar-excel", action="store_true", help="Exporta un backup Excel desde Supabase y termina")
+    args = parser.parse_args()
 
-# --- FUNCIÓN PARA ESPERAR NUEVA VENTANA ---
-def esperar_y_cambiar_ventana(ventana_principal, timeout=20):
-    """Espera a que se abra una nueva ventana/pestaña y cambia a ella"""
-    tiempo_inicio = time.time()
-    
-    while time.time() - tiempo_inicio < timeout:
-        try:
-            todas_ventanas = driver.window_handles
-            
-            if len(todas_ventanas) > 1:
-                ventana_nueva = todas_ventanas[-1]
-                if ventana_nueva != ventana_principal:
-                    print(f"Cambiando a ventana activa (total: {len(todas_ventanas)})")
-                    driver.switch_to.window(ventana_nueva)
-                    time.sleep(2)
-                    return True
-        except:
-            pass
-        
-        time.sleep(0.5)
-    
-    # Fallback: usar última ventana si existe
-    try:
-        todas_ventanas = driver.window_handles
-        if len(todas_ventanas) > 1:
-            ventana_nueva = todas_ventanas[-1]
-            print(f"Usando última ventana disponible (total: {len(todas_ventanas)})")
-            driver.switch_to.window(ventana_nueva)
-            time.sleep(2)
-            return True
-    except:
-        pass
-    
-    raise TimeoutError(f"No se abrio ninguna ventana después de {timeout} segundos")
+    if args.exportar_excel:
+        ruta = exportar_backup_excel()
+        log(f"[OK] Backup Excel generado: {ruta}")
+        return
 
-# --- FUNCIÓN DE APOYO ---
-def obtener_escrituras_descargadas():
-    """Obtiene las escrituras ya descargadas"""
-    descargadas = set()
-    if os.path.exists(download_folder):
-        for archivo in os.listdir(download_folder):
-            nombre_sin_ext = os.path.splitext(archivo)[0]
-            escritura = nombre_sin_ext.split('_')[0] if '_' in nombre_sin_ext else nombre_sin_ext.split(' ')[0]
-            descargadas.add(escritura)
-    return descargadas
+    # 1) Traer pendientes solo desde Supabase
+    df_pendientes = obtener_pendientes_desde_supabase()
 
-def obtener_escrituras_con_pdf(carpeta):
-    s = set()
-    for f in os.listdir(carpeta):
-        if f.lower().endswith(".pdf"):
-            base = os.path.splitext(f)[0]
-            esc = base.split("_")[0].split(" ")[0]
-            if esc.isdigit():
-                s.add(esc)
-    return s
+    if df_pendientes.empty:
+        log("[INFO] No hay pendientes en Supabase")
+        return
 
-def preparar_listos_para_enviar(df, carpeta_pdfs):
-    if "estado_ctl" in df.columns:
-        estados = df["estado_ctl"].apply(normalize_estado_ctl_value)
-        pagos = df["pago"].apply(lambda value: "Ingresado" if is_pago_ingresado(value) else str(value).strip())
-        mask_pend = (~estados.eq("Enviado")) & pagos.eq("Ingresado")
-    else:
-        mask_pend = pd.Series([True] * len(df), index=df.index)
+    # 2) Excluir lo que ya existe en carpeta local para evitar redescargas accidentales
+    escrituras_descargadas = obtener_escrituras_descargadas(DOWNLOAD_FOLDER)
+    antes = len(df_pendientes)
+    df_pendientes = df_pendientes[~df_pendientes["escritura_str"].isin(escrituras_descargadas)].copy()
+    omitidas = antes - len(df_pendientes)
+    if omitidas:
+        log(f"[INFO] Se omitieron {omitidas} escrituras porque ya hay PDFs en la carpeta local")
 
-    con_pdf = obtener_escrituras_con_pdf(carpeta_pdfs)
-    mask_pdf = df["escritura_str"].isin(con_pdf)
+    if df_pendientes.empty:
+        log("[INFO] No hay pendientes nuevos por procesar")
+        return
 
-    return df[mask_pend & mask_pdf].copy()
+    log("=========================================")
+    log(f"[READY] Pendientes desde Supabase: {len(df_pendientes)}")
+    log("=========================================")
 
-def buscar_pdf_en_carpeta(carpeta, escritura):
-    for f in os.listdir(carpeta):
-        if f.lower().endswith(".pdf") and escritura in f:
-            return os.path.join(carpeta, f)
-    return None
+    if args.solo_listar:
+        columnas = [c for c in ["escritura", "nir", "estado_ctl", "pago"] if c in df_pendientes.columns]
+        print(df_pendientes[columnas].head(50).to_string(index=False))
+        return
 
-    df_excel = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
-
-    col_estado_ctl = next(c for c in df_excel.columns if "estado_ctl" in c.lower().replace(" ", ""))
-    col_escritura = next(c for c in df_excel.columns if "escritura" in c.lower().replace(" ", ""))
-    df_excel["escritura_str"] = (
-        pd.to_numeric(df_excel[col_escritura], errors="coerce")
-        .fillna(0).astype(int).astype(str)
-    )
-
-    mask = df_excel["escritura_str"] == escritura_str
-    df_excel.loc[mask, col_estado_ctl] = nuevo_estado
-
-    with pd.ExcelWriter(ruta_xlsx, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-        df_excel.to_excel(writer, sheet_name=hoja, index=False)
-
-def normalizar(valor):
-    txt = str(valor).strip()
-    return txt[:-2] if txt.endswith('.0') else txt
-
-escrituras_descargadas = obtener_escrituras_con_pdf(download_folder)
-# --- PROCESO PRINCIPAL ---
-
-pendientes_supabase = get_pending_certificados_liq(limit=10000, page=1, sort_by='escritura', desc=False)
-df_pendientes = pd.DataFrame(pendientes_supabase.data or [])
-
-if df_pendientes.empty:
-    if os.path.exists(ruta_xlsx):
-        try:
-            df_backup = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
-            df_backup.columns = df_backup.columns.astype(str).str.strip().str.lower().str.replace("á", "a").str.replace("é", "e").str.replace("í", "i").str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
-            df_backup['escritura_str'] = df_backup['escritura'].apply(normalizar)
-            df_backup['nir_str'] = df_backup['nir'].apply(normalizar)
-            df_backup['estado_ctl'] = df_backup['estado_ctl'].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
-            df_pendientes = df_backup[df_backup.apply(is_row_pending_for_certificados, axis=1)].copy()
-        except Exception as e:
-            print(f"[WARN] No se pudo usar el backup de Excel: {e}")
-
-if not df_pendientes.empty:
-    if 'escritura_str' not in df_pendientes.columns:
-        df_pendientes['escritura_str'] = df_pendientes['escritura'].apply(normalizar)
-    if 'nir_str' not in df_pendientes.columns:
-        df_pendientes['nir_str'] = df_pendientes['nir'].apply(normalizar)
-    if 'estado_ctl' in df_pendientes.columns:
-        df_pendientes['estado_ctl'] = df_pendientes['estado_ctl'].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
-
-    df_pendientes = df_pendientes[
-        (df_pendientes['escritura_str'] != "") & 
-        (df_pendientes['nir_str'] != "")
-    ].copy()
-else:
-    df_pendientes = pd.DataFrame(columns=['escritura_str', 'nir_str', 'estado_ctl', 'pago', 'correo', 'gobernacion', 'nir', 'escritura'])
-
-print(f"Pendientes a procesar: {len(df_pendientes)}\n")
-
-# Excluir escrituras que ya están en la carpeta de descargas para evitar redescargas
-escrituras_descargadas = obtener_escrituras_con_pdf(download_folder)
-if not isinstance(escrituras_descargadas, set):
-    escrituras_descargadas = set(escrituras_descargadas)
-
-# Filtrar pendientes para no procesar escrituras ya descargadas
-antes = len(df_pendientes)
-df_pendientes = df_pendientes[~df_pendientes['escritura_str'].isin(escrituras_descargadas)].copy()
-skipped = antes - len(df_pendientes)
-if skipped:
-    print(f"[INFO] Se omiten {skipped} escrituras porque ya existen en la carpeta de descargas")
-    print("[INFO] Estas escrituras no se marcan como 'Descargado' automáticamente; se marcarán solo después de una descarga real.")
-
-if len(df_pendientes) == 0:
-    print(" Todos los certificados ya han sido descargados!")
-    print("\n OPCIONES:")
-    print("   1. Si necesitas REPROCESAR TODO, descomenta esta línea:")
-    print("      # escrituras_descargadas = set()  # Vaciar set")
-    print("      # df_pendientes = df.copy()")
-    print("   2. O borra archivos de la carpeta de descargas:")
-    print(f"      {download_folder}")
-    driver.quit()
-else:
+    # 3) Driver / Selenium
+    driver = None
     procesados = 0
     errores = 0
-    
-    for index, row in df_pendientes.iterrows():
-        nir = str(int(float(row["nir"])))
-        escritura = str(int(float(row["escritura"])))
 
-        print(f"\n{'='*60}")
-        print(f"Procesando: {escritura}")
-        print(f"{'='*60}")
+    try:
+        driver = crear_driver()
+        wait = WebDriverWait(driver, WAIT_SECONDS)
 
-        obs = []
-        try:
-            
-            # Validar que driver esté funcional
-            try:
-                ventana_principal = driver.current_window_handle
-            except:
-                print(f"[ERROR] Driver desconectado, reiniciando...")
-                if service:
-                    driver = webdriver.Edge(service=service, options=edge_options)
-                else:
-                    driver = webdriver.Edge(options=edge_options)
-                wait = WebDriverWait(driver, 10)
-                ventana_principal = driver.current_window_handle
-            
-            try:
-                driver.execute_cdp_cmd("Page.setDownloadBehavior", {
-                    "behavior": "allow",
-                    "downloadPath": download_folder
-                })
-            except Exception as e:
-                print(f"[ERROR] No se pudo aplicar CDP DownloadBehavior:", e)
-            
-            driver.get("https://radicacion.supernotariado.gov.co/app/inicio.dma")
-            
-            print(f"[INFO] Buscando 'Certificados'...")
-            wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Certificados"))).click()
-            time.sleep(2)
-            
-            print(f"[INFO] Ingresando NIR: {nir}")
-            input_nir = wait.until(EC.presence_of_element_located((By.ID, "formSearch:j_idt44")))
-            input_nir.clear()
-            input_nir.send_keys(nir)
-            obs.append("Búsqueda iniciada")
-            
-            print(f"[INFO] Buscando...")
-            boton_buscar = driver.find_element(By.ID, "formSearch:j_idt45")
-            boton_buscar.click()
-            time.sleep(3)
-            
-            print(f"[INFO] Buscando botones de descarga...")
-            try:
-                # Usar la nueva función para descargar MÚLTIPLES archivos
-                archivos_descargados = descargar_multiples_archivos(driver, wait, escritura)
-
-                if archivos_descargados:
-                    print(f"[INFO] Se descargaron {len(archivos_descargados)} archivo(s)")
-                    obs.append(f"Descargados {len(archivos_descargados)} archivos")
-                    # Actualizar también en la tabla liq en Supabase - usar activity_type='cert_download'
-                    try:
-                        update_liq_estado_by_escritura(escritura, "Descargado", activity_type='cert_download')
-                        insert_log("descarga_certificado", f"Escritura {escritura} marcada como Descargado", row.get('correo', ''))
-                    except Exception as e:
-                        print(f"[WARN] No se pudo actualizar Supabase: {e}")
-                    # Guardar cada archivo descargado en Supabase (subir bytes)
-                    try:
-                        for fname in archivos_descargados:
-                            ruta_archivo = os.path.join(download_folder, fname)
-                            try:
-                                with open(ruta_archivo, "rb") as f:
-                                    contenido = f.read()
-                                try:
-                                    guardar_descarga("certificado", escritura, fname, contenido, row.get('correo'))
-                                    print(f"[INFO] Guardado en Supabase: {fname}")
-                                except Exception as e:
-                                    print(f"[WARN] No se pudo guardar en Supabase: {e}")
-                            except Exception as e:
-                                print(f"[WARN] No se pudo leer archivo {ruta_archivo}: {e}")
-                    except Exception:
-                        pass
-                    print(f"  [INFO] CERTIFICADO(S) OK")
-                    procesados += 1
-                else:
-                    print(f"  [ERROR] No se pudo descargar ningún archivo")
-                    print(f"[ERROR] Fallo descarga")
-                    obs.append("Fallo descarga")
-                    errores += 1
-                    # Registrar en logs de Supabase el fallo
-                    try:
-                        insert_log("descarga_certificado_error", f"Escritura {escritura} - no files downloaded", row.get('correo', ''), "error")
-                    except Exception:
-                        pass
-            except Exception as e:
-                print(f"  [ERROR] Error: {str(e)[:100]}")
+        for _, row in df_pendientes.iterrows():
+            ok = procesar_una_escritura(driver, wait, row)
+            if ok:
+                procesados += 1
+            else:
                 errores += 1
-                try:
-                    insert_log("descarga_certificado_error", f"Escritura {escritura} - exception {str(e)[:200]}", row.get('correo', ''), "error")
-                except Exception:
-                    pass
-            
-            # Limpiar ventanas
+
+    finally:
+        if driver is not None:
             try:
-                ventanas_ahora = driver.window_handles
-                if len(ventanas_ahora) > 1 and ventana_principal in ventanas_ahora:
-                    driver.close()
-                    time.sleep(1)
-                    driver.switch_to.window(ventana_principal)
-            except:
+                driver.quit()
+            except Exception:
                 pass
 
-        except Exception as e:
-            print(f"\n[ERROR] Error: {str(e)[:100]}")
-            errores += 1
-            try:
-                ventanas = driver.window_handles
-                if ventana_principal in ventanas:
-                    driver.switch_to.window(ventana_principal)
-            except:
-                pass
-            df_pendientes.at[index, 'Resultado'] = "; ".join(obs)
-            continue
+    log("=========================================")
+    log(f"[FIN] Procesados OK: {procesados}")
+    log(f"[FIN] Con error    : {errores}")
+    log("=========================================")
 
-        df_pendientes.at[index, 'Resultado'] = "; ".join(obs)
 
-    driver.quit()    
-    
-    print("\n" + "="*50)
-    print("[INFO] RESUMEN DEL PROCESO")
-    print("="*50)
-    print(f"[OK] Descargados en esta sesión: {procesados}")
-    print(f"[ERROR] Con errores: {errores}")
-    print(f"[INFO] Total en carpeta: {len(obtener_escrituras_descargadas())}")
-    print("="*50)
+if __name__ == "__main__":
+    main()

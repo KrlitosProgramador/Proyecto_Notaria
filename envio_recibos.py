@@ -17,6 +17,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
 import sys
+
+from supabase_auth import Any, Optional
 from supabase_client import (
     insert_recibo,
     update_certificado_estado,
@@ -29,6 +31,7 @@ from supabase_client import (
     normalize_escritura,
     get_pending_liq,
 )
+from supabase import ClientOptions, create_client, Client
 
 warnings.filterwarnings("ignore")
 
@@ -36,17 +39,117 @@ warnings.filterwarnings("ignore")
 # CONFIG
 # =========================
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-RUTA_XLSX = os.path.join(APP_DIR, "Informe.xlsx")
-CARPETA_PDFS = os.path.join(APP_DIR, "descargas", "recibos")
-
-# Crear carpeta de descargas si no existe
-os.makedirs(CARPETA_PDFS, exist_ok=True)
+DOWNLOAD_FOLDER = os.path.join(APP_DIR, "descargas", "recibos")
+DRIVER_PATH = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
+BACKUP_DIR = os.path.join(APP_DIR, "backups")
+TABLE_NAME = "liq"
+WAIT_SECONDS = 20
 
 EDGE_USER_DATA_DIR = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data")
 EDGE_PROFILE_DIR = "Default"
 REL = r"https://radicacion.supernotariado.gov.co/app/inicio.dma"
 DESTINATARIO_DEFAULT = "pruebas@ejemplo.com"
 WAIT_SECONDS = 25
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    # fall back to empty client placeholder to avoid crashes during import
+    supabase: Client | None = None
+else:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def get_supabase() -> Client:
+    return supabase
+
+def create_client(
+    supabase_url: str,
+    supabase_key: str,
+    options: Optional[ClientOptions] = None,
+) -> Client:
+    """Create client function to instantiate supabase client like JS runtime.
+
+    Parameters
+    ----------
+    supabase_url: str
+        The URL to the Supabase instance that should be connected to.
+    supabase_key: str
+        The API key to the Supabase instance that should be connected to.
+    **options
+        Any extra settings to be optionally specified - also see the
+        `DEFAULT_OPTIONS` dict.
+
+    Examples
+    --------
+    Instantiating the client.
+    >>> import os
+    >>> from supabase import create_client, Client
+    >>>
+    >>> url: str = os.environ.get("SUPABASE_TEST_URL")
+    >>> key: str = os.environ.get("SUPABASE_TEST_KEY")
+    >>> supabase: Client = create_client(url, key)
+
+    Returns
+    -------
+    Client
+    """
+    return Client.create(
+        supabase_url=supabase_url, supabase_key=supabase_key, options=options
+    )
+
+# =========================
+# HELPERS GENERALES
+# =========================
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def normalizar_texto(valor: Any) -> str:
+    if valor is None:
+        return ""
+    txt = str(valor).strip()
+    if txt.lower() == "nan":
+        return ""
+    return txt
+
+
+def normalizar_numero_excel(valor: Any) -> str:
+    txt = normalizar_texto(valor)
+    return txt[:-2] if txt.endswith(".0") else txt
+
+
+def preparar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.lower()
+        .str.replace("á", "a")
+        .str.replace("é", "e")
+        .str.replace("í", "i")
+        .str.replace("ó", "o")
+        .str.replace("ú", "u")
+        .str.replace("\n", " ")
+        .str.replace("\r", "")
+    )
+
+    # Normalizaciones defensivas
+    for col in ["estado_ctl", "pago", "escritura", "nir", "notificacion"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    df["estado_ctl"] = df["estado_ctl"].fillna("").astype(str).str.strip().str.lower()
+    df["notificacion"] = df["notificacion"].fillna("").astype(str).str.strip().str.lower()
+    df["pago"] = df["pago"].fillna("").astype(str).str.strip().str.lower()
+    df["escritura_str"] = df["escritura"].apply(normalizar_numero_excel)
+    df["nir_str"] = df["nir"].apply(normalizar_numero_excel)
+    return df
+
 
 # =========================
 # EDGE (Jupyter-safe)
@@ -138,78 +241,6 @@ def get_edge_driver(carpeta_pdfs, user_data_dir, profile_dir="Default"):
     _DRIVER = webdriver.Edge(service=service, options=options)
     return _DRIVER
 
-# =========================
-# EXCEL
-# =========================
-def preparar_excel(df):
-    df.columns = (
-        df.columns.astype(str).str.strip().str.lower()
-        .str.replace("á", "a").str.replace("é", "e").str.replace("í", "i")
-        .str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
-    )
-
-    col_correo = next((c for c in df.columns if "correo" in c or "email" in c or "e-mail" in c), None)
-    if col_correo and col_correo != "correo":
-        df.rename(columns={col_correo: "correo"}, inplace=True)
-    elif "correo" not in df.columns:
-        df["correo"] = ""
-
-    col_gob = next((c for c in df.columns if "gobernacion" in c or "gobern" in c or "entidad" in c), None)
-    if col_gob and col_gob != "gobernacion":
-        df.rename(columns={col_gob: "gobernacion"}, inplace=True)
-    elif "gobernacion" not in df.columns:
-        df["gobernacion"] = ""      
-    col_pago = next((c for c in df.columns if "pago" in c or "pagado" in c), None)
-    if col_pago and col_pago != "pago":
-        df.rename(columns={col_pago: "pago"}, inplace=True)
-    elif "pago" not in df.columns:
-        df["pago"] = "" 
-
-    col_notif = next((c for c in df.columns if "notificacion" in c.lower() or "notif" in c.lower()), None)
-    if col_notif and col_notif != "notificacion":
-        df.rename(columns={col_notif: "notificacion"}, inplace=True)
-    elif "notificacion" not in df.columns:
-        df["notificacion"] = ""
-
-    if "gobernacion" in df.columns:
-        df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
-    if "correo" in df.columns:
-        df["correo"] = df["correo"].fillna("").astype(str).str.strip()
-    if "pago" in df.columns:
-        df["pago"] = df["pago"].fillna("").astype(str).str.strip()
-    if "notificacion" in df.columns:
-        df["notificacion"] = df["notificacion"].fillna("").astype(str).str.strip()
-        df["notificacion"] = df["notificacion"].apply(normalize_notificacion_value)
-    
-    return df
-
-def cargar_excel(ruta_xlsx):
-    if not os.path.exists(ruta_xlsx):
-        print(f"[WARNING] No se encontró el archivo Excel: {ruta_xlsx}. Se usará Supabase como fuente principal.")
-        return pd.DataFrame(), "Liq."
-
-    xls = pd.ExcelFile(ruta_xlsx)
-    hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
-
-    raw = pd.read_excel(xls, sheet_name=hoja, header=None, dtype=str)
-
-    header_row = None
-    for i in range(len(raw)):
-        if raw.iloc[i].astype(str).str.contains("Escritura", case=False, na=False).any():
-            header_row = i
-            break
-    if header_row is None:
-        raise KeyError("No se encontró la fila de encabezados con 'Escritura'")
-
-    df = pd.read_excel(xls, sheet_name=hoja, header=header_row, dtype=str)
-    df.columns = df.columns.astype(str).str.strip()
-
-    col_escritura = next(c for c in df.columns if "escritura" in c.lower().replace(" ", ""))
-    df["escritura_str"] = (
-        pd.to_numeric(df[col_escritura], errors="coerce")
-        .fillna(0).astype(int).astype(str)
-    )
-    return df, hoja
 
 def obtener_escrituras_con_pdf(carpeta):
     s = set()
@@ -771,7 +802,7 @@ else:
 
 driver = None
 try:
-    driver = get_edge_driver(CARPETA_PDFS, EDGE_USER_DATA_DIR, EDGE_PROFILE_DIR)
+    driver = get_edge_driver(DOWNLOAD_FOLDER, EDGE_USER_DATA_DIR, EDGE_PROFILE_DIR)
     wait = WebDriverWait(driver, WAIT_SECONDS)
     driver.get("https://mail.google.com/mail/u/0/#inbox")
 except Exception as e:
@@ -798,7 +829,7 @@ for _, row in df_listo.iterrows():
             row["notificacion"] = "Pendiente"
 
     # Buscar TODOS los archivos asociados a esta escritura
-    rutas_archivos = buscar_pdfs_en_carpeta(CARPETA_PDFS, escritura)
+    rutas_archivos = buscar_pdfs_en_carpeta(DOWNLOAD_FOLDER, escritura)
     if not rutas_archivos:
         print("[ERROR] Sin archivos:", escritura)
         continue
@@ -847,7 +878,7 @@ for _, row in df_listo.iterrows():
             try:
                 insert_recibo(numero_recibo, certificado_id, monto, email_destino)
                 if certificado_id:
-                    update_certificado_estado(certificado_id, "enviado")
+                    insert_recibo(certificado_id, "enviado")
                 insert_log("envio_recibo", f"Recibo {numero_recibo or certificado_id} registrado", correo)
             except Exception as e:
                 insert_log("envio_recibo", f"Error al registrar recibo: {str(e)}", correo, "error")
