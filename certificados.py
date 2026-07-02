@@ -9,7 +9,17 @@ from selenium.webdriver.edge.options import Options
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver import ActionChains
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, SessionNotCreatedException, StaleElementReferenceException
-from supabase_client import insert_certificado, insert_log, update_liq_estado_by_escritura, guardar_descarga
+from supabase_client import (
+    insert_certificado,
+    insert_log,
+    update_liq_estado_by_escritura,
+    guardar_descarga,
+    normalize_estado_ctl_value,
+    is_estado_enviado,
+    is_pago_ingresado,
+    is_row_pending_for_certificados,
+    get_pending_certificados_liq,
+)
 
 # --- HELPERS PARA CLIC ROBUSTO ---
 
@@ -161,24 +171,24 @@ os.makedirs(download_folder, exist_ok=True)
 
 print(f"[INFO] Carpeta de descargas: {download_folder}")
 
-# Validar que el archivo Excel existe
+# Validar el archivo Excel solo como respaldo; si no existe, seguimos con Supabase
 if not os.path.exists(ruta_xlsx):
-    print(f"[ERROR] Archivo Excel no encontrado: {ruta_xlsx}")
-    sys.exit(1)
+    print(f"[WARN] Archivo Excel no encontrado: {ruta_xlsx}. Se usará Supabase como fuente principal.")
+    hoja = "Liq."
+else:
+    if not os.path.exists(download_folder):
+        os.makedirs(download_folder)
+        print(f"[INFO] Carpeta creada")
 
-if not os.path.exists(download_folder):
-    os.makedirs(download_folder)
-    print(f"[INFO] Carpeta creada")
-
-# Determinar la hoja del Excel
-try:
-    xls = pd.ExcelFile(ruta_xlsx)
-    hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
-    print(f"[INFO] Hoja a usar: {hoja}")
-except Exception as e:
-    print(f"[ERROR] No se pudo leer el archivo Excel: {str(e)}")
-    print(f"[ERROR] El archivo podría estar corrupto o en uso por otra aplicación.")
-    sys.exit(1)
+    # Determinar la hoja del Excel
+    try:
+        xls = pd.ExcelFile(ruta_xlsx)
+        hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
+        print(f"[INFO] Hoja a usar: {hoja}")
+    except Exception as e:
+        print(f"[WARN] No se pudo leer el archivo Excel: {str(e)}")
+        print("[WARN] Se continuará con Supabase como fuente principal.")
+        hoja = "Liq."
 
 # --- CONFIGURACIÓN DE EDGE ---
 edge_options = Options()
@@ -496,79 +506,6 @@ def obtener_escrituras_descargadas():
             descargadas.add(escritura)
     return descargadas
 
-def preparar_excel(df):
-    df.columns = (
-        df.columns.astype(str).str.strip().str.lower()
-        .str.replace("á", "a").str.replace("é", "e").str.replace("í", "i")
-        .str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
-    )
-
-    col_pago = next((c for c in df.columns if "pago" in c or "payment" in c), None)
-    if col_pago and col_pago != "pago":
-        df.rename(columns={col_pago: "pago"}, inplace=True)
-    elif "pago" not in df.columns:
-        df["pago"] = ""
-
-    col_ingreso = next((c for c in df.columns if "ingreso" in c or "gobern" in c or "entidad" in c), None)
-    if col_ingreso and col_ingreso != "ingreso":
-        df.rename(columns={col_ingreso: "ingreso"}, inplace=True)
-    elif "ingreso" not in df.columns:
-        df["ingreso"] = ""
-        
-    col_correo = next((c for c in df.columns if "correo" in c or "email" in c or "e-mail" in c), None)
-    if col_correo and col_correo != "correo":
-        df.rename(columns={col_correo: "correo"}, inplace=True)
-    elif "correo" not in df.columns:
-        df["correo"] = ""
-
-    col_gob = next((c for c in df.columns if "gobernacion" in c or "gobern" in c or "entidad" in c), None)
-    if col_gob and col_gob != "gobernacion":
-        df.rename(columns={col_gob: "gobernacion"}, inplace=True)
-    elif "gobernacion" not in df.columns:
-        df["gobernacion"] = ""
-        
-    col_estado_ctl = next((c for c in df.columns if ("estado" in c and "ctl" in c) or "certificado" in c), None)
-    if col_estado_ctl and col_estado_ctl != "estado_ctl":
-        df.rename(columns={col_estado_ctl: "estado_ctl"}, inplace=True)
-    elif "estado_ctl" not in df.columns:
-        df["estado_ctl"] = ""
-
-    if "ingreso" in df.columns:
-        df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
-    if "pago" in df.columns:
-        df["pago"] = df["pago"].fillna("").astype(str).str.strip()
-    if "gobernacion" in df.columns:
-        df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
-    if "correo" in df.columns:
-        df["correo"] = df["correo"].fillna("").astype(str).str.strip()        
-    if "estado_ctl" in df.columns:
-        df["estado_ctl"] = df["estado_ctl"].fillna("").astype(str).str.strip()
-    return df
-
-def cargar_excel(ruta_xlsx):
-    xls = pd.ExcelFile(ruta_xlsx)
-    hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
-
-    raw = pd.read_excel(xls, sheet_name=hoja, header=None, dtype=str)
-
-    header_row = None
-    for i in range(len(raw)):
-        if raw.iloc[i].astype(str).str.contains("Escritura", case=False, na=False).any():
-            header_row = i
-            break
-    if header_row is None:
-        raise KeyError("No se encontró la fila de encabezados con 'Escritura'")
-
-    df = pd.read_excel(xls, sheet_name=hoja, header=header_row, dtype=str)
-    df.columns = df.columns.astype(str).str.strip()
-
-    col_escritura = next(c for c in df.columns if "escritura" in c.lower().replace(" ", ""))
-    df["escritura_str"] = (
-        pd.to_numeric(df[col_escritura], errors="coerce")
-        .fillna(0).astype(int).astype(str)
-    )
-    return df, hoja
-
 def obtener_escrituras_con_pdf(carpeta):
     s = set()
     for f in os.listdir(carpeta):
@@ -581,7 +518,9 @@ def obtener_escrituras_con_pdf(carpeta):
 
 def preparar_listos_para_enviar(df, carpeta_pdfs):
     if "estado_ctl" in df.columns:
-        mask_pend = df["estado_ctl"].astype(str).str.strip().str.lower() != "Enviado".lower()
+        estados = df["estado_ctl"].apply(normalize_estado_ctl_value)
+        pagos = df["pago"].apply(lambda value: "Ingresado" if is_pago_ingresado(value) else str(value).strip())
+        mask_pend = (~estados.eq("Enviado")) & pagos.eq("Ingresado")
     else:
         mask_pend = pd.Series([True] * len(df), index=df.index)
 
@@ -596,7 +535,6 @@ def buscar_pdf_en_carpeta(carpeta, escritura):
             return os.path.join(carpeta, f)
     return None
 
-def actualizar_estado_excel(ruta_xlsx, hoja, escritura_str, nuevo_estado):
     df_excel = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
 
     col_estado_ctl = next(c for c in df_excel.columns if "estado_ctl" in c.lower().replace(" ", ""))
@@ -619,28 +557,36 @@ def normalizar(valor):
 escrituras_descargadas = obtener_escrituras_con_pdf(download_folder)
 # --- PROCESO PRINCIPAL ---
 
-df = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
-df.columns = df.columns.astype(str).str.strip().str.lower().str.replace("á", "a").str.replace("é", "e").str.replace("í", "i").str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
+pendientes_supabase = get_pending_certificados_liq(limit=10000, page=1, sort_by='escritura', desc=False)
+df_pendientes = pd.DataFrame(pendientes_supabase.data or [])
 
-df['escritura_str'] = df['escritura'].apply(normalizar)
-df['nir_str'] = df['nir'].apply(normalizar)
+if df_pendientes.empty:
+    if os.path.exists(ruta_xlsx):
+        try:
+            df_backup = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
+            df_backup.columns = df_backup.columns.astype(str).str.strip().str.lower().str.replace("á", "a").str.replace("é", "e").str.replace("í", "i").str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
+            df_backup['escritura_str'] = df_backup['escritura'].apply(normalizar)
+            df_backup['nir_str'] = df_backup['nir'].apply(normalizar)
+            df_backup['estado_ctl'] = df_backup['estado_ctl'].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
+            df_pendientes = df_backup[df_backup.apply(is_row_pending_for_certificados, axis=1)].copy()
+        except Exception as e:
+            print(f"[WARN] No se pudo usar el backup de Excel: {e}")
 
-# 3. Normalización de columnas de estado (Minúsculas y sin espacios)
-# Asumimos que existen las columnas 'Estado de pago', 'Ingreso' y 'Estado_Ctl'
-df['estado_ctl'] = df['estado_ctl'].fillna("").str.strip().str.lower()
+if not df_pendientes.empty:
+    if 'escritura_str' not in df_pendientes.columns:
+        df_pendientes['escritura_str'] = df_pendientes['escritura'].apply(normalizar)
+    if 'nir_str' not in df_pendientes.columns:
+        df_pendientes['nir_str'] = df_pendientes['nir'].apply(normalizar)
+    if 'estado_ctl' in df_pendientes.columns:
+        df_pendientes['estado_ctl'] = df_pendientes['estado_ctl'].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
 
-# 4. Aplicación de la Triple Condición (AND)
-filtro_estricto = ((df['estado_ctl'] != 'Enviado'.lower())
-                   & (df['pago'].str.strip().str.lower() == 'Ingresado'.lower())
-                   )
+    df_pendientes = df_pendientes[
+        (df_pendientes['escritura_str'] != "") & 
+        (df_pendientes['nir_str'] != "")
+    ].copy()
+else:
+    df_pendientes = pd.DataFrame(columns=['escritura_str', 'nir_str', 'estado_ctl', 'pago', 'correo', 'gobernacion', 'nir', 'escritura'])
 
-df_pendientes = df[filtro_estricto].copy()
-
-# 5. Limpieza de filas con datos incompletos
-df_pendientes = df_pendientes[
-    (df_pendientes['escritura_str'] != "") & 
-    (df_pendientes['nir_str'] != "")
-].copy()
 print(f"Pendientes a procesar: {len(df_pendientes)}\n")
 
 # Excluir escrituras que ya están en la carpeta de descargas para evitar redescargas
@@ -725,7 +671,6 @@ else:
                 if archivos_descargados:
                     print(f"[INFO] Se descargaron {len(archivos_descargados)} archivo(s)")
                     obs.append(f"Descargados {len(archivos_descargados)} archivos")
-                    actualizar_estado_excel(ruta_xlsx, hoja, escritura, "Descargado")
                     # Actualizar también en la tabla liq en Supabase - usar activity_type='cert_download'
                     try:
                         update_liq_estado_by_escritura(escritura, "Descargado", activity_type='cert_download')
@@ -787,10 +732,10 @@ else:
                     driver.switch_to.window(ventana_principal)
             except:
                 pass
-            df.at[index,'Resultado'] = "; ".join(obs)
+            df_pendientes.at[index, 'Resultado'] = "; ".join(obs)
             continue
 
-        df.at[index,'Resultado'] = "; ".join(obs)
+        df_pendientes.at[index, 'Resultado'] = "; ".join(obs)
 
     driver.quit()    
     

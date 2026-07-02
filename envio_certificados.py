@@ -18,7 +18,15 @@ from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from supabase_client import update_liq_estado_by_escritura, insert_log
+from supabase_client import (
+    update_liq_estado_by_escritura,
+    insert_log,
+    normalize_estado_ctl_value,
+    normalize_escritura,
+    is_estado_enviado,
+    is_pago_ingresado,
+    get_pending_certificados_liq,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -200,7 +208,9 @@ def obtener_escrituras_con_pdf(carpeta):
 
 def preparar_listos_para_enviar(df, carpeta_pdfs):
     if "estado_ctl" in df.columns:
-        mask_pend = (df["estado_ctl"].astype(str).str.strip().str.lower() != "enviado") & (df['pago'].astype(str).str.strip().str.lower() == "ingresado")
+        estados = df["estado_ctl"].apply(normalize_estado_ctl_value)
+        pagos = df["pago"].apply(lambda value: "Ingresado" if is_pago_ingresado(value) else str(value).strip())
+        mask_pend = (~estados.eq("Enviado")) & pagos.eq("Ingresado")
     else:
         mask_pend = pd.Series([True] * len(df), index=df.index)
 
@@ -208,6 +218,12 @@ def preparar_listos_para_enviar(df, carpeta_pdfs):
     mask_pdf = df["escritura_str"].isin(con_pdf)
 
     return df[mask_pend & mask_pdf].copy()
+
+
+def obtener_pendientes_desde_supabase(limit: int = 10000):
+    """Obtiene los certificados pendientes desde Supabase como fuente principal."""
+    res = get_pending_certificados_liq(limit=limit, page=1, sort_by="escritura", desc=False)
+    return res.data or []
 
 def buscar_pdf_en_carpeta(carpeta, escritura):
     """Busca el primer PDF asociado a una escritura (compatibilidad hacia atrás)"""
@@ -472,10 +488,26 @@ if __name__ == "__main__":
         enviar_certificado_unico(payload)
         sys.exit(0)
 
-    df, hoja = cargar_excel(RUTA_XLSX)
-    df = preparar_excel(df)
-
-    df_listo = preparar_listos_para_enviar(df, CARPETA_PDFS)
+    # Obtener pendientes desde Supabase (fuente principal)
+    pendientes_supabase = obtener_pendientes_desde_supabase()
+    if pendientes_supabase:
+        df_listo = pd.DataFrame(pendientes_supabase)
+        if "escritura_str" not in df_listo.columns:
+            df_listo["escritura_str"] = df_listo["escritura"].apply(normalize_escritura)
+        if "correo" not in df_listo.columns:
+            df_listo["correo"] = ""
+        if "gobernacion" not in df_listo.columns:
+            df_listo["gobernacion"] = ""
+        if "nir" not in df_listo.columns:
+            df_listo["nir"] = ""
+        if "pago" not in df_listo.columns:
+            df_listo["pago"] = ""
+        if "estado_ctl" in df_listo.columns:
+            df_listo["estado_ctl"] = df_listo["estado_ctl"].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
+        df_listo = df_listo[df_listo["escritura_str"].astype(str).str.strip() != ""].copy()
+    else:
+        print("[ERROR] No hay certificados pendientes en Supabase.")
+        sys.exit(1)
 
     driver = get_edge_driver(CARPETA_PDFS, EDGE_USER_DATA_DIR, EDGE_PROFILE_DIR)
     wait = WebDriverWait(driver, WAIT_SECONDS)

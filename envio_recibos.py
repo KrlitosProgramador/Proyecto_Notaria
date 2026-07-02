@@ -17,7 +17,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
 import sys
-from supabase_client import insert_recibo, update_certificado_estado, insert_log, get_supabase, update_liq_estado_by_escritura, guardar_descarga
+from supabase_client import (
+    insert_recibo,
+    update_certificado_estado,
+    insert_log,
+    get_supabase,
+    update_liq_estado_by_escritura,
+    guardar_descarga,
+    normalize_notificacion_value,
+    is_notificacion_pendiente,
+    normalize_escritura,
+    get_pending_liq,
+)
 
 warnings.filterwarnings("ignore")
 
@@ -154,16 +165,29 @@ def preparar_excel(df):
     elif "pago" not in df.columns:
         df["pago"] = "" 
 
+    col_notif = next((c for c in df.columns if "notificacion" in c.lower() or "notif" in c.lower()), None)
+    if col_notif and col_notif != "notificacion":
+        df.rename(columns={col_notif: "notificacion"}, inplace=True)
+    elif "notificacion" not in df.columns:
+        df["notificacion"] = ""
+
     if "gobernacion" in df.columns:
         df["gobernacion"] = df["gobernacion"].fillna("").astype(str).str.strip()
     if "correo" in df.columns:
         df["correo"] = df["correo"].fillna("").astype(str).str.strip()
     if "pago" in df.columns:
         df["pago"] = df["pago"].fillna("").astype(str).str.strip()
+    if "notificacion" in df.columns:
+        df["notificacion"] = df["notificacion"].fillna("").astype(str).str.strip()
+        df["notificacion"] = df["notificacion"].apply(normalize_notificacion_value)
     
     return df
 
 def cargar_excel(ruta_xlsx):
+    if not os.path.exists(ruta_xlsx):
+        print(f"[WARNING] No se encontró el archivo Excel: {ruta_xlsx}. Se usará Supabase como fuente principal.")
+        return pd.DataFrame(), "Liq."
+
     xls = pd.ExcelFile(ruta_xlsx)
     hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
 
@@ -199,7 +223,7 @@ def obtener_escrituras_con_pdf(carpeta):
 
 def preparar_listos_para_enviar(df, carpeta_pdfs):
     if "notificacion" in df.columns:
-        mask_pend = df["notificacion"].astype(str).str.strip().str.lower() == "pendiente"
+        mask_pend = df["notificacion"].apply(is_notificacion_pendiente)
     else:
         mask_pend = pd.Series([True] * len(df), index=df.index)
 
@@ -207,6 +231,29 @@ def preparar_listos_para_enviar(df, carpeta_pdfs):
     mask_pdf = df["escritura_str"].isin(con_pdf)
 
     return df[mask_pend & mask_pdf].copy()
+
+
+def obtener_pendientes_desde_supabase(limit: int = 10000):
+    """Obtiene las escrituras pendientes desde Supabase, que es la fuente principal."""
+    res = get_pending_liq(limit=limit, page=1, sort_by="escritura", desc=False, require_estado_ctl_pending=False)
+    rows = res.data or []
+    return rows
+
+
+def get_liq_record_by_escritura(escritura):
+    """Obtiene un registro de Supabase por escritura si el Excel no lo trae."""
+    supabase = get_supabase()
+    if not supabase:
+        return None
+    try:
+        normalized = normalize_escritura(escritura)
+        for field_name in ("escritura", "escritura_str"):
+            res = supabase.table("liq").select("*").eq(field_name, normalized or escritura).execute()
+            if getattr(res, "data", None):
+                return res.data[0]
+    except Exception:
+        return None
+    return None
 
 def buscar_pdf_en_carpeta(carpeta, escritura):
     """Busca el primer PDF asociado a una escritura (compatibilidad hacia atrás)"""
@@ -216,8 +263,9 @@ def buscar_pdf_en_carpeta(carpeta, escritura):
 def buscar_pdfs_en_carpeta(carpeta, escritura):
     """Busca TODOS los archivos (PDF, DOC, DOCX) asociados a una escritura"""
     escritura = str(escritura).strip()
-    patron = re.compile(rf"^{re.escape(escritura)}(\D|$)", re.IGNORECASE)
-    
+    if not escritura:
+        return []
+
     archivos = []
     extensiones_validas = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".jpg", ".png")
 
@@ -225,10 +273,12 @@ def buscar_pdfs_en_carpeta(carpeta, escritura):
         if not f.lower().endswith(extensiones_validas):
             continue
         base = os.path.splitext(f)[0]
-        if patron.search(base):
+        nombre = base.lower()
+        escritura_norm = str(escritura).lower()
+        if nombre == escritura_norm or nombre.startswith(escritura_norm + "_") or nombre.startswith(escritura_norm + "-") or nombre.startswith(escritura_norm + " ") or escritura_norm in nombre:
             archivos.append(os.path.join(carpeta, f))
-    
-    return sorted(archivos)  # Ordenar para consistencia
+
+    return sorted(archivos)
 
 # =========================
 # GMAIL
@@ -699,14 +749,34 @@ def actualizar_estado_excel(ruta_xlsx, hoja, escritura_str, nuevo_estado):
 # =========================
 # RUN
 # =========================
-df, hoja = cargar_excel(RUTA_XLSX)
-df = preparar_excel(df)
+# Obtener pendientes desde Supabase (fuente principal)
+pendientes_supabase = obtener_pendientes_desde_supabase()
+if pendientes_supabase:
+    df_listo = pd.DataFrame(pendientes_supabase)
+    if "escritura_str" not in df_listo.columns:
+        df_listo["escritura_str"] = df_listo["escritura"].apply(normalize_escritura)
+    if "correo" not in df_listo.columns:
+        df_listo["correo"] = ""
+    if "gobernacion" not in df_listo.columns:
+        df_listo["gobernacion"] = ""
+    if "nir" not in df_listo.columns:
+        df_listo["nir"] = ""
+    if "notificacion" not in df_listo.columns:
+        df_listo["notificacion"] = "Pendiente"
+    df_listo["notificacion"] = df_listo["notificacion"].apply(normalize_notificacion_value)
+    df_listo = df_listo[df_listo["notificacion"].apply(is_notificacion_pendiente)]
+else:
+    print("[ERROR] No hay recibos pendientes en Supabase.")
+    sys.exit(1)
 
-df_listo = preparar_listos_para_enviar(df, CARPETA_PDFS)
-
-driver = get_edge_driver(CARPETA_PDFS, EDGE_USER_DATA_DIR, EDGE_PROFILE_DIR)
-wait = WebDriverWait(driver, WAIT_SECONDS)
-driver.get("https://mail.google.com/mail/u/0/#inbox")
+driver = None
+try:
+    driver = get_edge_driver(CARPETA_PDFS, EDGE_USER_DATA_DIR, EDGE_PROFILE_DIR)
+    wait = WebDriverWait(driver, WAIT_SECONDS)
+    driver.get("https://mail.google.com/mail/u/0/#inbox")
+except Exception as e:
+    print(f"[WARN] No se pudo abrir Gmail: {e}")
+    wait = None
 
 procesadas = set()
 
@@ -721,6 +791,12 @@ for _, row in df_listo.iterrows():
     if escritura in procesadas:
         continue
 
+    liq_record = get_liq_record_by_escritura(escritura)
+    if liq_record:
+        row = {**row.to_dict(), **liq_record}
+        if "notificacion" not in row or not str(row.get("notificacion", "")).strip():
+            row["notificacion"] = "Pendiente"
+
     # Buscar TODOS los archivos asociados a esta escritura
     rutas_archivos = buscar_pdfs_en_carpeta(CARPETA_PDFS, escritura)
     if not rutas_archivos:
@@ -730,10 +806,11 @@ for _, row in df_listo.iterrows():
     correo, asunto, cuerpo = construir_mensaje(row)
 
     try:
+        if driver is None or wait is None:
+            raise RuntimeError("No hay conexión activa con Gmail/Edge")
         crear_borrador_con_multiples_adjuntos(driver, wait, correo, asunto, cuerpo, rutas_archivos)
         nombres_archivos = ", ".join([os.path.basename(r) for r in rutas_archivos])
         print(f"[INFO] Escritura: {escritura} -> Adjuntando {len(rutas_archivos)} archivo(s): {nombres_archivos}")
-        actualizar_estado_excel(RUTA_XLSX, hoja, escritura, "Enviado")
         # Actualizar estado en Supabase - usar activity_type='recibos' para actualizar a 'Notificado'
         try:
             update_liq_estado_by_escritura(escritura, "Enviado", activity_type='notificacion')
