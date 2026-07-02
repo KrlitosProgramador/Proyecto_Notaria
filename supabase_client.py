@@ -1,4 +1,7 @@
 import os
+import re
+import unicodedata
+from types import SimpleNamespace
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -59,22 +62,115 @@ def check_table_exists(table_name: str) -> bool:
         raise
 
 
+def normalize_text(value):
+    """Normaliza texto para comparaciones de forma consistente."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return ""
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+
+
 def normalize_escritura(escritura):
     """Normaliza valores de escritura para comparación y deduplicación."""
-    if escritura is None:
-        return None
-    valor = str(escritura).strip()
+    valor = normalize_text(escritura)
     if not valor:
         return None
-    valor = valor.replace(' ', '').replace('-', '').replace('.', '').lower()
-    if not valor:
+    value_without_separators = valor.replace(' ', '').replace('-', '').lower()
+    if not value_without_separators:
         return None
-    try:
-        if valor.replace('.', '', 1).isdigit():
-            valor = str(int(float(valor)))
-    except Exception:
-        pass
-    return valor
+    match = re.fullmatch(r"(?P<int_part>\d+)(?:\.(?P<decimal_part>0+))?", value_without_separators)
+    if match:
+        return str(int(match.group("int_part")))
+    if value_without_separators.isdigit():
+        return str(int(value_without_separators))
+    return value_without_separators.replace('.', '')
+
+
+def normalize_estado_ctl_value(value):
+    """Normaliza estados de estado_ctl para comparaciones exactas."""
+    text = normalize_text(value)
+    if not text:
+        return ""
+    lowered = text.lower()
+    mapping = {
+        "enviado": "Enviado",
+        "send": "Enviado",
+        "sent": "Enviado",
+        "descargado": "Descargado",
+        "downloaded": "Descargado",
+        "pendiente": "Pendiente",
+        "pending": "Pendiente",
+        "notificado": "Notificado",
+        "notificacion": "Notificado",
+        "ingreso": "Ingreso",
+        "ingresado": "Ingresado",
+    }
+    return mapping.get(lowered, text)
+
+
+def normalize_notificacion_value(value):
+    """Normaliza estados de notificación para comparaciones exactas."""
+    text = normalize_text(value)
+    if not text:
+        return ""
+    lowered = text.lower()
+    mapping = {
+        "enviado": "Enviado",
+        "send": "Enviado",
+        "sent": "Enviado",
+        "notificado": "Enviado",
+        "notificacion": "Enviado",
+        "pendiente": "Pendiente",
+        "pending": "Pendiente",
+        "sin enviar": "Pendiente",
+        "sin_enviar": "Pendiente",
+        "no enviado": "Pendiente",
+        "no_enviado": "Pendiente",
+        "por enviar": "Pendiente",
+        "por_enviar": "Pendiente",
+        "pendiente por enviar": "Pendiente",
+        "pendiente_por_enviar": "Pendiente",
+    }
+    return mapping.get(lowered, text)
+
+
+def is_estado_enviado(value) -> bool:
+    return normalize_estado_ctl_value(value) == "Enviado"
+
+
+def is_row_pending_for_recibos(row: dict | None) -> bool:
+    if not row:
+        return False
+    value = row.get("notificacion")
+    if value is None:
+        return True
+    normalized = normalize_notificacion_value(value)
+    if not normalized:
+        return True
+    return normalized == "Pendiente"
+
+
+def is_row_pending_for_certificados(row: dict | None) -> bool:
+    if not row:
+        return False
+    if not is_pago_ingresado(row.get("pago")):
+        return False
+    estado = normalize_estado_ctl_value(row.get("estado_ctl"))
+    return estado not in {"Enviado", "Descargado"}
+
+
+def is_notificacion_pendiente(value) -> bool:
+    normalized = normalize_notificacion_value(value)
+    if not normalized:
+        return True
+    return normalized == "Pendiente"
+
+
+def is_pago_ingresado(value) -> bool:
+    text = normalize_text(value).lower()
+    return text in {"ingresado", "ingreso", "pagado", "yes", "si"}
 
 
 MAX_PAGE_SIZE = 10000
@@ -111,21 +207,45 @@ def _apply_pagination(query, page: int = 1, page_size: int = 10000):
     return query
 
 
-def get_pending_liq(limit: int = 10000, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
+def get_pending_liq(limit: int = 10000, page: int = 1, sort_by: str = 'escritura', desc: bool = False, require_estado_ctl_pending: bool = True):
     limit = max(1, min(limit, MAX_PAGE_SIZE))
     page = max(1, page)
-    """Obtiene filas pendientes: filtro básico por estado_ctl != 'enviado' y pago=='Ingresado'"""
+    """Obtiene filas pendientes usando una comparación robusta de estado y pago."""
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")
-    query = (
-        supabase.table("liq")
-        .select("*")
-        .filter("estado_ctl", "neq", "Enviado")
-        .filter("pago", "ilike", "Ingresado")
-    )
-    query = _apply_sort(query, sort_by, desc)
-    query = _apply_pagination(query, page, limit)
-    return query.execute()
+
+    res = supabase.table("liq").select("*").filter("notificacion", "ilike", "Pendiente").execute()
+    rows = res.data or []
+    if require_estado_ctl_pending:
+        rows = [row for row in rows if not is_estado_enviado(row.get("estado_ctl"))]
+    else:
+        rows = [row for row in rows if is_row_pending_for_recibos(row)]
+
+    if sort_by and sort_by in ALLOWED_SORT_COLUMNS:
+        rows = sorted(rows, key=lambda row: row.get(sort_by) or "", reverse=desc)
+
+    start = (page - 1) * limit
+    end = start + limit
+    return SimpleNamespace(data=rows[start:end], count=len(rows))
+
+
+def get_pending_certificados_liq(limit: int = 10000, page: int = 1, sort_by: str = 'escritura', desc: bool = False):
+    limit = max(1, min(limit, MAX_PAGE_SIZE))
+    page = max(1, page)
+    """Obtiene filas pendientes de certificados usando Supabase como fuente principal."""
+    if not supabase:
+        raise RuntimeError("Supabase client no configurado.")
+
+    res = supabase.table("liq").select("*").execute()
+    rows = res.data or []
+    rows = [row for row in rows if is_row_pending_for_certificados(row)]
+
+    if sort_by and sort_by in ALLOWED_SORT_COLUMNS:
+        rows = sorted(rows, key=lambda row: row.get(sort_by) or "", reverse=desc)
+
+    start = (page - 1) * limit
+    end = start + limit
+    return SimpleNamespace(data=rows[start:end], count=len(rows))
 
 def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activity_type: str = None):
     """
@@ -144,8 +264,7 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     if not supabase:
         raise RuntimeError("Supabase client no configurado.")
     
-    # Determinar el estado según la actividad
-    estado_final = nuevo_estado  # Por defecto, usa el estado proporcionado
+    estado_final = nuevo_estado
     
     if activity_type == 'notificacion':
         estado_final = 'Enviado'
@@ -154,11 +273,8 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     elif activity_type == 'cert_download':
         estado_final = 'Descargado'
     elif activity_type == 'cert_send':
-        # Para envío de certificados, busca estados 'Descargado' o que no sean 'Enviado'
-        # y actualiza a 'Enviado'
         estado_final = 'Enviado'
     
-    # Determinar la columna a actualizar según la actividad
     if activity_type == 'notificacion':
         field = 'notificacion'
         estado_final = 'Enviado'
@@ -174,19 +290,35 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     else:
         field = 'notificacion'
 
-    update_payload = {field: estado_final}
+    update_payload = {field: normalize_estado_ctl_value(estado_final) or estado_final}
 
-    # Intentar actualizar por la columna `escritura` primero
-    try:
-        res = supabase.table("liq").update(update_payload).eq("escritura", escritura_str).execute()
-        # Si no actualizó, intentar con escritura_str
-        count = getattr(res, 'count', None)
-        if (count is None and not (res.data and len(res.data) > 0)) or (count == 0):
-            res = supabase.table("liq").update(update_payload).eq("escritura_str", escritura_str).execute()
-    except Exception:
+    values_to_try = []
+    normalized_escritura = normalize_escritura(escritura_str)
+    if escritura_str is not None:
+        values_to_try.append(escritura_str)
+    if normalized_escritura is not None:
+        values_to_try.append(normalized_escritura)
+        try:
+            values_to_try.append(int(normalized_escritura))
+        except Exception:
+            pass
+
+    res = None
+    for value in dict.fromkeys(values_to_try):
+        for field_name in ("escritura", "escritura_str"):
+            try:
+                res = supabase.table("liq").update(update_payload).eq(field_name, value).execute()
+                count = getattr(res, 'count', None)
+                if (count is not None and count > 0) or (res.data and len(res.data) > 0):
+                    break
+            except Exception:
+                continue
+        if res and ((getattr(res, 'count', None) or 0) > 0 or (res.data and len(res.data) > 0)):
+            break
+
+    if res is None:
         res = supabase.table("liq").update(update_payload).eq("escritura_str", escritura_str).execute()
 
-    # Intentar mover automáticamente si el registro completó el proceso
     try:
         _check_and_move_if_complete(escritura_str)
     except Exception:
@@ -289,29 +421,22 @@ def get_liq_stats():
     if pago_ingresado is None:
         pago_ingresado = len(pago_res.data or [])
 
-    # pendientes (pago ingresado y estado_ctl != 'Enviado')
     pendientes_res = (
         supabase.table("liq")
         .select("*", count="exact")
         .filter("pago", "ilike", "Ingresado")
-        .filter("estado_ctl", "neq", "Enviado")
         .execute()
     )
-    pendientes = getattr(pendientes_res, "count", None)
-    if pendientes is None:
-        pendientes = len(pendientes_res.data or [])
+    pendientes_rows = [row for row in (pendientes_res.data or []) if not is_estado_enviado(row.get("estado_ctl"))]
+    pendientes = len(pendientes_rows)
 
-    # procesados (pago ingresado y estado_ctl == 'Enviado')
     procesados_res = (
         supabase.table("liq")
         .select("*", count="exact")
         .filter("pago", "ilike", "Ingresado")
-        .filter("estado_ctl", "ilike", "Enviado")
         .execute()
     )
-    procesados = getattr(procesados_res, "count", None)
-    if procesados is None:
-        procesados = len(procesados_res.data or [])
+    procesados = len([row for row in (procesados_res.data or []) if is_estado_enviado(row.get("estado_ctl"))])
 
     table_counts = {}
     for table_name in ['liq', 'liq_2025', 'liq_2026']:
