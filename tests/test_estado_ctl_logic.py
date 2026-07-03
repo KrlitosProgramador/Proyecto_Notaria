@@ -7,6 +7,7 @@ from supabase_client import (
     get_pending_certificados_liq,
     normalize_escritura,
     normalize_estado_ctl_value,
+    extract_escritura_from_filename,
     is_row_pending_for_certificados,
     is_row_pending_for_recibos,
 )
@@ -97,6 +98,45 @@ class EstadoCtlLogicTests(unittest.TestCase):
 
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]["escritura"], "123")
+
+    def test_extract_escritura_from_filename(self):
+        self.assertEqual(extract_escritura_from_filename("00123 Certificado.pdf"), "123")
+        self.assertEqual(extract_escritura_from_filename("123_Certificado.pdf"), "123")
+        self.assertEqual(extract_escritura_from_filename("  1234 - recibo.pdf"), "1234")
+        self.assertEqual(extract_escritura_from_filename("abc123.pdf"), None)
+
+    def test_update_liq_estado_by_escritura_skips_auto_move_for_cert_download(self):
+        class FakeQuery:
+            def __init__(self):
+                self._data = [{'id': 1}]
+            def update(self, payload):
+                self.payload = payload
+                return self
+            def eq(self, field, value):
+                self.field = field
+                self.value = value
+                return self
+            def execute(self):
+                return SimpleNamespace(data=self._data)
+
+        class FakeSupabase:
+            def table(self, name):
+                return FakeQuery()
+
+        original_supabase = supabase_client.supabase
+        original_check = supabase_client._check_and_move_if_complete
+        supabase_client.supabase = FakeSupabase()
+        called = []
+        supabase_client._check_and_move_if_complete = lambda escritura: called.append(escritura)
+        try:
+            res = supabase_client.update_liq_estado_by_escritura("123", "Descargado", activity_type='cert_download')
+        finally:
+            supabase_client.supabase = original_supabase
+            supabase_client._check_and_move_if_complete = original_check
+
+        self.assertEqual(len(called), 0)
+        self.assertTrue(hasattr(res, 'data'))
+        self.assertEqual(res.data[0]['id'], 1)
 
 
 if __name__ == "__main__":

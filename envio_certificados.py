@@ -21,8 +21,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from supabase_client import (
     update_liq_estado_by_escritura,
     insert_log,
+    normalize_text,
     normalize_estado_ctl_value,
     normalize_escritura,
+    extract_escritura_from_filename,
     is_estado_enviado,
     is_pago_ingresado,
     get_pending_certificados_liq,
@@ -200,9 +202,8 @@ def obtener_escrituras_con_pdf(carpeta):
     s = set()
     for f in os.listdir(carpeta):
         if f.lower().endswith(".pdf"):
-            base = os.path.splitext(f)[0]
-            esc = base.split("_")[0].split(" ")[0]
-            if esc.isdigit():
+            esc = extract_escritura_from_filename(f)
+            if esc:
                 s.add(esc)
     return s
 
@@ -232,9 +233,10 @@ def buscar_pdf_en_carpeta(carpeta, escritura):
 
 def buscar_pdfs_en_carpeta(carpeta, escritura):
     """Busca TODOS los archivos (PDF, DOC, DOCX) asociados a una escritura"""
-    escritura = str(escritura).strip()
-    patron = re.compile(rf"^{re.escape(escritura)}(\D|$)", re.IGNORECASE)
-    
+    escritura_norm = normalize_escritura(escritura)
+    if not escritura_norm:
+        return []
+
     archivos = []
     extensiones_validas = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".jpg", ".png")
 
@@ -242,10 +244,17 @@ def buscar_pdfs_en_carpeta(carpeta, escritura):
         if not f.lower().endswith(extensiones_validas):
             continue
         base = os.path.splitext(f)[0]
-        if patron.search(base):
+        nombre = normalize_text(base).lower()
+        if (
+            nombre == escritura_norm
+            or nombre.startswith(escritura_norm + " ")
+            or nombre.startswith(escritura_norm + "_")
+            or nombre.startswith(escritura_norm + "-")
+            or re.search(rf"\b{re.escape(escritura_norm)}\b", nombre)
+        ):
             archivos.append(os.path.join(carpeta, f))
-    
-    return sorted(archivos)  # Ordenar para consistencia
+
+    return sorted(archivos)
 
 # =========================
 # GMAIL

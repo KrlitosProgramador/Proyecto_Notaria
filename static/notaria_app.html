@@ -24,7 +24,6 @@
     <button class="btn btn-ghost hamburger" id="btn-hamburger" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button> 
     <div id="user-id" style="margin-right:8px;color:#f0efec;font-size:12px">Er3k1M1c48</div>
     <button class="btn btn-primary btn-sm" onclick="openAddModal()">Nuevo Registro <i class="fa fa-plus"></i></button>
-    <button class="btn btn-primary btn-sm" onclick="procesarTodos()">Procesar Pendientes <i class="fa fa-cogs"></i></button>
     <button class="btn btn-secondary btn-sm" onclick="descargarCertificados()">Descargar Certificados <i class="fa fa-download"></i></button>
     <button class="btn btn-secondary btn-sm" onclick="enviarCertificados()">Envío Certificados <i class="fa fa-paper-plane"></i></button>
     <button class="btn btn-secondary btn-sm" onclick="enviarRecibos()">Envío Recibos <i class="fa fa-paper-plane"></i> </button>
@@ -273,7 +272,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Gobernación</th><th>Fecha Proceso</th><th>Borrador</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Gobernación</th><th>Fecha Proceso</th><th>Borrador</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="proc-table-body"></tbody>
@@ -295,7 +294,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="liq2025-table-body"></tbody>
@@ -317,7 +316,7 @@
         <table>
           <thead>
             <tr>
-              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th>
+              <th>Escritura</th><th>NIR</th><th>Correo</th><th>Pago</th><th>Estado CTL</th><th>Notificación</th><th>Gobernación</th><th>Fecha Proceso</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="liq2026-table-body"></tbody>
@@ -1475,7 +1474,7 @@ function renderProcesados() {
   if (!tbody) return;
   const rows = getFilteredProcesados();
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon"> </div><div class="empty-title">Sin procesos</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"> </div><div class="empty-title">Sin procesos</div></div></td></tr>';
     const pageBar = document.getElementById('pagination-procesados');
     if (pageBar) pageBar.innerHTML = '';
     return;
@@ -1493,6 +1492,10 @@ function renderProcesados() {
       <td>${gobBadge(r.gobernacion)}</td>
       <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso||'—'}</td>
       <td>${draft?`<button class="btn btn-secondary btn-sm" onclick="verCorreo('${r.escritura}')"><i class="fas fa-envelope"></i> Ver borrador</button>`:'<span style="color:var(--muted)">—</span>'}</td>
+      <td><div class="row-actions">
+        <button class="btn btn-ghost btn-sm" title="Ver detalle" onclick="verDetalle(${JSON.stringify(r.escritura)})"><i class="fas fa-eye"></i></button>
+        <button class="btn btn-primary btn-sm" title="Procesar" onclick="procesarUno(${JSON.stringify(r.escritura)})"><i class="fas fa-cogs"></i></button>
+      </div></td>
     </tr>`;
   }).join('');
   renderPagination('procesados', rows.length);
@@ -1502,7 +1505,7 @@ function renderLiqTable(tableName) {
   const viewKey = tableName.replace('_', '');
   const tbody = document.getElementById(`${viewKey}-table-body`);
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Cargando registros...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">Cargando registros...</td></tr>';
   loadLiqTable(tableName);
 }
 
@@ -1521,7 +1524,7 @@ async function loadLiqTable(tableName) {
     }
     rows = getFilteredLiqTable(tableName);
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No hay registros en esta tabla</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No hay registros en esta tabla</td></tr>';
       const pageBar = document.getElementById(`pagination-${viewKey}`);
       if (pageBar) pageBar.innerHTML = '';
       return;
@@ -1530,6 +1533,7 @@ async function loadLiqTable(tableName) {
     if (pageState.page > totalPages) pageState.page = totalPages;
     const pageRows = paginateRows(rows, pageState.page, pageState.pageSize);
     tbody.innerHTML = pageRows.map(r => {
+      const esc = r.escritura || '';
       return `<tr>
         <td class="td-escritura">${r.escritura || '—'}</td>
         <td class="mono">${r.nir || '—'}</td>
@@ -1539,11 +1543,15 @@ async function loadLiqTable(tableName) {
         <td>${estadoBadge(r.notificacion)}</td>
         <td>${gobBadge(r.gobernacion)}</td>
         <td style="font-size:10px;color:var(--muted)">${r.fecha_proceso || r.updated_at || '—'}</td>
+        <td><div class="row-actions">
+          <button class="btn btn-ghost btn-sm" title="Ver detalle" onclick="verDetalle(${JSON.stringify(esc)})"><i class="fas fa-eye"></i></button>
+          <button class="btn btn-primary btn-sm" title="Procesar" onclick="procesarUno(${JSON.stringify(esc)})"><i class="fas fa-cogs"></i></button>
+        </div></td>
       </tr>`;
     }).join('');
     renderPagination(viewKey, rows.length);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Error cargando tabla: ${escapeHtml(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">Error cargando tabla: ${escapeHtml(e.message)}</td></tr>`;
     const pageBar = document.getElementById(`pagination-${viewKey}`);
     if (pageBar) pageBar.innerHTML = '';
   }
@@ -1878,22 +1886,10 @@ function verDetalle(esc) {
     <div class="detail-item">
       <div class="detail-key">Gobernación</div>
       <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">— sin gobernación —</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>Bolívar</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>Boyacá</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>Atlántico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-key">Ruta Documento</div>
-      <div class="detail-val"><input class="form-input" id="detail-ruta_documento" value="${reg.ruta_documento||''}"></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-key">Tipo de archivo</div>
-      <div class="detail-val"><select class="form-select" id="detail-mail-type"><option value="">Auto</option><option value="recibo" ${BORRADORES[normalizarEscritura(reg.escritura)]?.tipo_override==='recibo'?'selected':''}>Recibo</option><option value="certificado" ${BORRADORES[normalizarEscritura(reg.escritura)]?.tipo_override==='certificado'?'selected':''}>Certificado</option></select></div>
-    </div>
+    </div>    
     <div class="detail-item">
       <div class="detail-key">Fecha Proceso</div>
       <div class="detail-val"><input class="form-input" id="detail-fecha_proceso" value="${reg.fecha_proceso||''}" readonly></div>
-    </div>
-    <div class="detail-item">
-      <div class="detail-key">Vista correo</div>
-      <div class="detail-val">${esRecibo(reg)?'<span class="tipo-recibo">Recibo</span>':'<span class="tipo-cert">Certificado</span>'}</div>
     </div>
   `;
 
@@ -2418,28 +2414,6 @@ function parseCsv(text) {
   renderImportPreview();
 }
 
-function cargarDatosMuestra() {
-  const muestra = [
-    { escritura:'1234', nir:'50C001234', correo:'cliente1@gmail.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'enviado', gobernacion:'', ruta_documento:'docs/1234_cert.pdf', fecha_proceso:null },
-    { escritura:'5678', nir:'50C005678', correo:'cliente2@hotmail.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'pendiente', gobernacion:'cundinamarca', ruta_documento:'docs/5678_recibo.pdf', fecha_proceso:null },
-    { escritura:'9012', nir:'50C009012', correo:'empresa@empresa.com', pago:'ingresado', estado_ctl:'enviado', notificacion:'enviado', gobernacion:'', ruta_documento:'', fecha_proceso:'15/05/2025 09:12' },
-    { escritura:'3456', nir:'50C003456', correo:'notaria@correo.co', pago:'pendiente', estado_ctl:'pendiente', notificacion:'pendiente', gobernacion:'bolivar', ruta_documento:'', fecha_proceso:null },
-    { escritura:'7890', nir:'50C007890', correo:'abogado@firma.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'enviado', gobernacion:'', ruta_documento:'docs/7890_trad.pdf', fecha_proceso:null },
-    { escritura:'2345', nir:'50C002345', correo:'cliente3@gmail.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'pendiente', gobernacion:'antioquia', ruta_documento:'', fecha_proceso:null },
-    { escritura:'6789', nir:'50C006789', correo:'propietario@correo.co', pago:'ingresado', estado_ctl:'enviado', notificacion:'enviado', gobernacion:'tolima', ruta_documento:'', fecha_proceso:'20/05/2025 14:30' },
-    { escritura:'1111', nir:'50C001111', correo:'comprador@gmail.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'pendiente', gobernacion:'boyaca', ruta_documento:'', fecha_proceso:null },
-    { escritura:'2222', nir:'50C002222', correo:'vendedor@gmail.com', pago:'ingresado', estado_ctl:'pendiente', notificacion:'pendiente', gobernacion:'santander', ruta_documento:'', fecha_proceso:null },
-    { escritura:'3333', nir:'50C003333', correo:'gerencia@inmob.co', pago:'ingresado', estado_ctl:'pendiente', notificacion:'enviado', gobernacion:'', ruta_documento:'docs/3333_lib.pdf', fecha_proceso:null },
-  ];
-  let cnt = 0;
-  muestra.forEach(r => {
-    if (!REGISTROS.find(x=>x.escritura===r.escritura)) { REGISTROS.push(r); cnt++; }
-  });
-  showNotif(`${cnt} registros de muestra cargados`, 'success');
-  actualizarUI();
-  renderImportPreview();
-}
-
 function renderImportPreview() {
   const cont = document.getElementById('import-preview');
   if (!cont) return;
@@ -2766,7 +2740,7 @@ async function procesarReciboBackendUnico(reg) {
 }
 
 // ================================================================
-// ENVÃO / DESCARGA CERTIFICADOS y acciones por selecciÃ³n
+// ENVIAR / DESCARGA CERTIFICADOS y acciones por selección
 // ================================================================
 async function enviarCertificados() {
   openModal('modal-proceso');

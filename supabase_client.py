@@ -88,6 +88,18 @@ def normalize_escritura(escritura):
     return value_without_separators.replace('.', '')
 
 
+def extract_escritura_from_filename(filename):
+    """Extrae la escritura normalizada de un nombre de archivo."""
+    if not filename:
+        return None
+    base = os.path.splitext(str(filename))[0]
+    base = normalize_text(base).lower()
+    match = re.match(r"^0*([0-9]+)", base)
+    if match:
+        return str(int(match.group(1)))
+    return None
+
+
 def normalize_estado_ctl_value(value):
     """Normaliza estados de estado_ctl para comparaciones exactas."""
     text = normalize_text(value)
@@ -319,10 +331,11 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     if res is None:
         res = supabase.table("liq").update(update_payload).eq("escritura_str", escritura_str).execute()
 
-    try:
-        _check_and_move_if_complete(escritura_str)
-    except Exception:
-        pass
+    if activity_type != 'cert_download':
+        try:
+            _check_and_move_if_complete(escritura_str)
+        except Exception:
+            pass
     return res
 
 
@@ -359,11 +372,16 @@ def update_liq_row(escritura_str: str, data: dict):
                 res = supabase.table("liq").update(payload).eq("escritura_str", escritura_str).execute()
             else:
                 raise
-    # Intentar mover automáticamente si el registro quedó completo
-    try:
-        _check_and_move_if_complete(escritura_str)
-    except Exception:
-        pass
+
+    skip_move = False
+    if 'estado_ctl' in payload and normalize_estado_ctl_value(payload.get('estado_ctl')).lower() == 'descargado':
+        skip_move = True
+
+    if not skip_move:
+        try:
+            _check_and_move_if_complete(escritura_str)
+        except Exception:
+            pass
     return res
 
 def get_certificados_por_usuario(usuario):
@@ -698,9 +716,9 @@ def _is_liq_row_complete(row: dict) -> bool:
     """Determina heurísticamente si una fila de `liq` está completa.
 
     Criterio (configurable aquí):
-    - `notificacion` contiene 'enviado'
-    - `pago` no contiene 'ingres' (case-insensitive)
-    - `estado_ctl` no contiene 'pend' ni 'pendiente'
+    - `notificacion` contiene 'enviado' o 'notificado'
+    - `pago` contiene 'ingresado' o 'pagado'
+    - `estado_ctl` es exactamente 'Enviado'
     """
     if not row:
         return False
@@ -710,13 +728,13 @@ def _is_liq_row_complete(row: dict) -> bool:
 
     notif = _val('notificacion')
     pago = _val('pago')
-    estado_ctl = _val('estado_ctl')
+    estado_ctl = normalize_estado_ctl_value(row.get('estado_ctl')).lower()
 
-    if 'enviado' not in notif:
+    if 'enviado' not in notif and 'notificado' not in notif:
         return False
     if 'ingresado' not in pago and 'pagado' not in pago:
         return False
-    if 'pend' in estado_ctl or 'pendiente' in estado_ctl:
+    if estado_ctl != 'enviado':
         return False
     return True
 

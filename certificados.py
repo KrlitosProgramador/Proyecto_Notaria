@@ -14,10 +14,13 @@ from supabase_client import (
     insert_log,
     update_liq_estado_by_escritura,
     guardar_descarga,
+    normalize_text,
     normalize_estado_ctl_value,
     is_estado_enviado,
     is_pago_ingresado,
     is_row_pending_for_certificados,
+    normalize_escritura,
+    extract_escritura_from_filename,
     get_pending_certificados_liq,
 )
 
@@ -160,8 +163,6 @@ def iniciar_edge_driver(ruta_driver, opciones):
 # --- CONFIGURACIÓN INICIAL ---
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 download_folder = os.path.join(APP_DIR, "descargas", "certificados")
-# ruta del fichero
-ruta_xlsx = os.path.join(APP_DIR, "Informe.xlsx")
 
 # Ruta local del driver (si existe)
 ruta_edgedriver = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
@@ -170,25 +171,6 @@ ruta_edgedriver = os.path.join(APP_DIR, "drivers", "msedgedriver.exe")
 os.makedirs(download_folder, exist_ok=True)
 
 print(f"[INFO] Carpeta de descargas: {download_folder}")
-
-# Validar el archivo Excel solo como respaldo; si no existe, seguimos con Supabase
-if not os.path.exists(ruta_xlsx):
-    print(f"[WARN] Archivo Excel no encontrado: {ruta_xlsx}. Se usará Supabase como fuente principal.")
-    hoja = "Liq."
-else:
-    if not os.path.exists(download_folder):
-        os.makedirs(download_folder)
-        print(f"[INFO] Carpeta creada")
-
-    # Determinar la hoja del Excel
-    try:
-        xls = pd.ExcelFile(ruta_xlsx)
-        hoja = "Liq." if "Liq." in xls.sheet_names else xls.sheet_names[0]
-        print(f"[INFO] Hoja a usar: {hoja}")
-    except Exception as e:
-        print(f"[WARN] No se pudo leer el archivo Excel: {str(e)}")
-        print("[WARN] Se continuará con Supabase como fuente principal.")
-        hoja = "Liq."
 
 # --- CONFIGURACIÓN DE EDGE ---
 edge_options = Options()
@@ -281,16 +263,16 @@ def descargar_multiples_archivos(driver, wait, escritura, timeout=120):
                     archivos_descargados.append(archivo_final)
                     print(f"[INFO] Descargado: {archivo_final}")
                 else:
-                    print(f"[ERROR] Error descargando archivo {idx}")
+                    print(f"[ERROR] Certificado no disponible {idx}")
                 
                 time.sleep(0.5)  # Pequeña pausa entre descargas
                 
             except Exception as e:
-                print(f"[ERROR] Error en descarga {idx}: {str(e)[:50]}")
+                print(f"[ERROR] Sin descarga {idx}: {str(e)[:50]}")
                 continue
     
     except Exception as e:
-        print(f"[ERROR] Error buscando botones de descarga: {str(e)[:100]}")
+        print(f"[ERROR] Sin botones de descarga: {str(e)[:100]}")
     
     return archivos_descargados
 
@@ -501,18 +483,17 @@ def obtener_escrituras_descargadas():
     descargadas = set()
     if os.path.exists(download_folder):
         for archivo in os.listdir(download_folder):
-            nombre_sin_ext = os.path.splitext(archivo)[0]
-            escritura = nombre_sin_ext.split('_')[0] if '_' in nombre_sin_ext else nombre_sin_ext.split(' ')[0]
-            descargadas.add(escritura)
+            esc = extract_escritura_from_filename(archivo)
+            if esc:
+                descargadas.add(esc)
     return descargadas
 
 def obtener_escrituras_con_pdf(carpeta):
     s = set()
     for f in os.listdir(carpeta):
         if f.lower().endswith(".pdf"):
-            base = os.path.splitext(f)[0]
-            esc = base.split("_")[0].split(" ")[0]
-            if esc.isdigit():
+            esc = extract_escritura_from_filename(f)
+            if esc:
                 s.add(esc)
     return s
 
@@ -530,25 +511,24 @@ def preparar_listos_para_enviar(df, carpeta_pdfs):
     return df[mask_pend & mask_pdf].copy()
 
 def buscar_pdf_en_carpeta(carpeta, escritura):
+    escritura_norm = normalize_escritura(escritura)
+    if not escritura_norm:
+        return None
+
     for f in os.listdir(carpeta):
-        if f.lower().endswith(".pdf") and escritura in f:
+        if not f.lower().endswith(".pdf"):
+            continue
+        base = os.path.splitext(f)[0]
+        nombre = normalize_text(base).lower()
+        if (
+            nombre == escritura_norm
+            or nombre.startswith(escritura_norm + " ")
+            or nombre.startswith(escritura_norm + "_")
+            or nombre.startswith(escritura_norm + "-")
+            or re.search(rf"\b{re.escape(escritura_norm)}\b", nombre)
+        ):
             return os.path.join(carpeta, f)
-    return None
-
-    df_excel = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
-
-    col_estado_ctl = next(c for c in df_excel.columns if "estado_ctl" in c.lower().replace(" ", ""))
-    col_escritura = next(c for c in df_excel.columns if "escritura" in c.lower().replace(" ", ""))
-    df_excel["escritura_str"] = (
-        pd.to_numeric(df_excel[col_escritura], errors="coerce")
-        .fillna(0).astype(int).astype(str)
-    )
-
-    mask = df_excel["escritura_str"] == escritura_str
-    df_excel.loc[mask, col_estado_ctl] = nuevo_estado
-
-    with pd.ExcelWriter(ruta_xlsx, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
-        df_excel.to_excel(writer, sheet_name=hoja, index=False)
+    return None    
 
 def normalizar(valor):
     txt = str(valor).strip()
@@ -559,18 +539,6 @@ escrituras_descargadas = obtener_escrituras_con_pdf(download_folder)
 
 pendientes_supabase = get_pending_certificados_liq(limit=10000, page=1, sort_by='escritura', desc=False)
 df_pendientes = pd.DataFrame(pendientes_supabase.data or [])
-
-if df_pendientes.empty:
-    if os.path.exists(ruta_xlsx):
-        try:
-            df_backup = pd.read_excel(ruta_xlsx, sheet_name=hoja, dtype=str)
-            df_backup.columns = df_backup.columns.astype(str).str.strip().str.lower().str.replace("á", "a").str.replace("é", "e").str.replace("í", "i").str.replace("ó", "o").str.replace("ú", "u").str.replace("\n", " ").str.replace("\r", "")
-            df_backup['escritura_str'] = df_backup['escritura'].apply(normalizar)
-            df_backup['nir_str'] = df_backup['nir'].apply(normalizar)
-            df_backup['estado_ctl'] = df_backup['estado_ctl'].fillna("").astype(str).str.strip().apply(normalize_estado_ctl_value)
-            df_pendientes = df_backup[df_backup.apply(is_row_pending_for_certificados, axis=1)].copy()
-        except Exception as e:
-            print(f"[WARN] No se pudo usar el backup de Excel: {e}")
 
 if not df_pendientes.empty:
     if 'escritura_str' not in df_pendientes.columns:

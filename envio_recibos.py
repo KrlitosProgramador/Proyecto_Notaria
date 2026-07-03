@@ -26,7 +26,9 @@ from supabase_client import (
     guardar_descarga,
     normalize_notificacion_value,
     is_notificacion_pendiente,
+    normalize_text,
     normalize_escritura,
+    extract_escritura_from_filename,
     get_pending_liq,
 )
 
@@ -215,9 +217,8 @@ def obtener_escrituras_con_pdf(carpeta):
     s = set()
     for f in os.listdir(carpeta):
         if f.lower().endswith(".pdf"):
-            base = os.path.splitext(f)[0]
-            esc = base.split("_")[0].split(" ")[0]
-            if esc.isdigit():
+            esc = extract_escritura_from_filename(f)
+            if esc:
                 s.add(esc)
     return s
 
@@ -262,8 +263,8 @@ def buscar_pdf_en_carpeta(carpeta, escritura):
 
 def buscar_pdfs_en_carpeta(carpeta, escritura):
     """Busca TODOS los archivos (PDF, DOC, DOCX) asociados a una escritura"""
-    escritura = str(escritura).strip()
-    if not escritura:
+    escritura_norm = normalize_escritura(escritura)
+    if not escritura_norm:
         return []
 
     archivos = []
@@ -273,9 +274,14 @@ def buscar_pdfs_en_carpeta(carpeta, escritura):
         if not f.lower().endswith(extensiones_validas):
             continue
         base = os.path.splitext(f)[0]
-        nombre = base.lower()
-        escritura_norm = str(escritura).lower()
-        if nombre == escritura_norm or nombre.startswith(escritura_norm + "_") or nombre.startswith(escritura_norm + "-") or nombre.startswith(escritura_norm + " ") or escritura_norm in nombre:
+        nombre = normalize_text(base).lower()
+        if (
+            nombre == escritura_norm
+            or nombre.startswith(escritura_norm + " ")
+            or nombre.startswith(escritura_norm + "_")
+            or nombre.startswith(escritura_norm + "-")
+            or re.search(rf"\b{re.escape(escritura_norm)}\b", nombre)
+        ):
             archivos.append(os.path.join(carpeta, f))
 
     return sorted(archivos)
