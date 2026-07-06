@@ -1888,6 +1888,10 @@ function verDetalle(esc) {
       <div class="detail-val"><select class="form-select" id="detail-gobernacion"><option value="">— sin gobernación —</option><option value="cundinamarca" ${normalizar(reg.gobernacion||'')==='cundinamarca'?'selected':''}>Cundinamarca</option><option value="bolivar" ${normalizar(reg.gobernacion||'')==='bolivar'?'selected':''}>Bolívar</option><option value="tolima" ${normalizar(reg.gobernacion||'')==='tolima'?'selected':''}>Tolima</option><option value="boyaca" ${normalizar(reg.gobernacion||'')==='boyaca'?'selected':''}>Boyacá</option><option value="santander" ${normalizar(reg.gobernacion||'')==='santander'?'selected':''}>Santander</option><option value="atlantico" ${normalizar(reg.gobernacion||'')==='atlantico'?'selected':''}>Atlántico</option><option value="antioquia" ${normalizar(reg.gobernacion||'')==='antioquia'?'selected':''}>Antioquia</option><option value="magdalena" ${normalizar(reg.gobernacion||'')==='magdalena'?'selected':''}>Magdalena</option></select></div>
     </div>    
     <div class="detail-item">
+      <div class="detail-key">Ruta Documento</div>
+      <div class="detail-val"><input class="form-input" id="detail-ruta_documento" value="${reg.ruta_documento||''}" placeholder="Ruta del documento..."></div>
+    </div>
+    <div class="detail-item">
       <div class="detail-key">Fecha Proceso</div>
       <div class="detail-val"><input class="form-input" id="detail-fecha_proceso" value="${reg.fecha_proceso||''}" readonly></div>
     </div>
@@ -2046,6 +2050,7 @@ async function guardarDetalleActual(esc, extra = {}) {
     throw new Error('Escritura duplicada');
   }
 
+  const rutaDocInput = document.getElementById('detail-ruta_documento');
   const payload = {
     escritura: escrituraFinal,
     nir: document.getElementById('detail-nir').value.trim(),
@@ -2054,7 +2059,7 @@ async function guardarDetalleActual(esc, extra = {}) {
     pago: normalizar(document.getElementById('detail-pago').value || reg.pago),
     estado_ctl: normalizar(document.getElementById('detail-estado_ctl').value || reg.estado_ctl),
     gobernacion: document.getElementById('detail-gobernacion').value || reg.gobernacion || '',
-    ruta_documento: document.getElementById('detail-ruta_documento').value.trim(),
+    ruta_documento: rutaDocInput ? rutaDocInput.value.trim() : (reg.ruta_documento || ''),
     ...extra,
   };
 
