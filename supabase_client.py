@@ -111,6 +111,8 @@ def normalize_estado_ctl_value(value):
         "send": "Enviado",
         "sent": "Enviado",
         "descargado": "Descargado",
+        "procesando": "Procesando",
+        "procesado": "Procesando",
         "downloaded": "Descargado",
         "pendiente": "Pendiente",
         "pending": "Pendiente",
@@ -170,7 +172,7 @@ def is_row_pending_for_certificados(row: dict | None) -> bool:
     if not is_pago_ingresado(row.get("pago")):
         return False
     estado = normalize_estado_ctl_value(row.get("estado_ctl"))
-    return estado not in {"Enviado", "Descargado"}
+    return estado not in {"Enviado", "Procesando"}
 
 
 def is_notificacion_pendiente(value) -> bool:
@@ -283,7 +285,7 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
     elif activity_type == 'pagos':
         estado_final = 'Ingreso'
     elif activity_type == 'cert_download':
-        estado_final = 'Descargado'
+        estado_final = 'Procesando'
     elif activity_type == 'cert_send':
         estado_final = 'Enviado'
     
@@ -295,7 +297,7 @@ def update_liq_estado_by_escritura(escritura_str: str, nuevo_estado: str, activi
         estado_final = 'Ingresado'
     elif activity_type == 'cert_download':
         field = 'estado_ctl'
-        estado_final = 'Descargado'
+        estado_final = 'Procesando'
     elif activity_type == 'cert_send':
         field = 'estado_ctl'
         estado_final = 'Enviado'
@@ -374,7 +376,7 @@ def update_liq_row(escritura_str: str, data: dict):
                 raise
 
     skip_move = False
-    if 'estado_ctl' in payload and normalize_estado_ctl_value(payload.get('estado_ctl')).lower() == 'descargado':
+    if 'estado_ctl' in payload and normalize_estado_ctl_value(payload.get('estado_ctl')).lower() == 'procesando':
         skip_move = True
 
     if not skip_move:
